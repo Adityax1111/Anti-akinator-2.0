@@ -374,7 +374,7 @@ export const AuthProvider = ({ children }) => {
 
 
     try {
-      const response = await api.post('api/auth/register', requestData);
+      const response = await api.post('/auth/register', requestData);
       
       const data = response.data;
 

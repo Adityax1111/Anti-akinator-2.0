@@ -121,6 +121,10 @@
 .payment-modal-body {
   padding: 22px;
   color: #e5e7eb;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
 }
 
 /* ============================================================ */
@@ -153,193 +157,8 @@
 }
 
 /* ============================================================ */
-/* STEP INDICATOR */
+/* ITEM INFO */
 /* ============================================================ */
-.step-indicator {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0;
-  width: 100%;
-  max-width: 200px;
-  margin: 0 auto;
-}
-
-.step-dot {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  font-weight: 700;
-  background: rgba(255, 255, 255, 0.06);
-  color: #4b5563;
-  border: 2px solid rgba(255, 255, 255, 0.06);
-  transition: all 0.3s ease;
-  flex-shrink: 0;
-}
-
-.step-dot.active {
-  background: #6c63ff;
-  color: #ffffff;
-  border-color: #6c63ff;
-  box-shadow: 0 0 20px rgba(108, 99, 255, 0.3);
-}
-
-.step-dot.done {
-  background: #10b981;
-  color: #ffffff;
-  border-color: #10b981;
-  font-size: 10px;
-}
-
-.step-line {
-  flex: 1;
-  height: 2px;
-  background: rgba(255, 255, 255, 0.06);
-  margin: 0 4px;
-  transition: all 0.3s ease;
-  max-width: 40px;
-}
-
-.step-line.done {
-  background: #10b981;
-}
-
-.step-labels {
-  display: flex;
-  justify-content: space-between;
-  width: 100%;
-  max-width: 200px;
-  margin: 4px auto 0;
-}
-
-.step-label {
-  font-size: 9px;
-  color: #4b5563;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  font-weight: 600;
-  transition: all 0.3s ease;
-}
-
-.step-label.active {
-  color: #6c63ff;
-}
-
-.step-label.done {
-  color: #10b981;
-}
-
-/* ============================================================ */
-/* INSTRUCTIONS BOX */
-/* ============================================================ */
-.instructions-box {
-  width: 100%;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 10px;
-  padding: 12px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.instruction-step {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 13px;
-  color: #d1d5db;
-}
-
-.instruction-number {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: rgba(108, 99, 255, 0.12);
-  color: #6c63ff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 10px;
-  font-weight: 700;
-  flex-shrink: 0;
-}
-
-.instruction-text {
-  line-height: 1.4;
-}
-
-.instruction-text strong {
-  color: #ffffff;
-}
-
-/* ============================================================ */
-/* TRUST MESSAGE */
-/* ============================================================ */
-.trust-message {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 10px 14px;
-  background: rgba(245, 158, 11, 0.06);
-  border: 1px solid rgba(245, 158, 11, 0.08);
-  border-radius: 8px;
-  font-size: 12px;
-  color: #94a3b8;
-  line-height: 1.5;
-  width: 100%;
-}
-
-.trust-message svg {
-  width: 16px;
-  height: 16px;
-  flex-shrink: 0;
-  margin-top: 1px;
-  color: #f59e0b;
-}
-
-.trust-message strong {
-  color: #fbbf24;
-}
-
-.trust-message.small {
-  padding: 8px 12px;
-  font-size: 11px;
-}
-
-.trust-message.small svg {
-  width: 14px;
-  height: 14px;
-}
-
-/* ============================================================ */
-/* FORM INSTRUCTION */
-/* ============================================================ */
-.form-instruction {
-  padding: 8px 14px;
-  background: rgba(108, 99, 255, 0.06);
-  border: 1px solid rgba(108, 99, 255, 0.08);
-  border-radius: 8px;
-  font-size: 13px;
-  color: #94a3b8;
-  text-align: center;
-  line-height: 1.5;
-}
-
-/* ============================================================ */
-/* QR STEP */
-/* ============================================================ */
-.qr-step {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-}
-
 .item-info {
   text-align: center;
   width: 100%;
@@ -369,7 +188,55 @@
   color: #6c63ff;
 }
 
-/* QR Container */
+/* ============================================================ */
+/* PAY ACTIONS - the one-tap UPI deep link */
+/* ============================================================ */
+.pay-actions {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.upi-pay-btn {
+  text-decoration: none;
+}
+
+.pay-hint-small {
+  font-size: 11px;
+  color: #64748b;
+  text-align: center;
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* ============================================================ */
+/* DIVIDER */
+/* ============================================================ */
+.divider-or {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap: 12px;
+  color: #64748b;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  font-weight: 600;
+}
+
+.divider-or::before,
+.divider-or::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* ============================================================ */
+/* QR CODE */
+/* ============================================================ */
 .qr-container {
   background: #ffffff;
   padding: 16px;
@@ -396,7 +263,9 @@
   border-radius: 8px;
 }
 
-/* UPI Details */
+/* ============================================================ */
+/* UPI DETAILS */
+/* ============================================================ */
 .upi-details {
   width: 100%;
   background: rgba(255, 255, 255, 0.04);
@@ -461,100 +330,54 @@
   height: 14px;
 }
 
-.upi-hint {
-  font-size: 12px;
-  color: #94a3b8;
-  margin: 6px 0 0 0;
-  text-align: center;
+/* ============================================================ */
+/* ATTENTION BANNER - the missed step, now unmissable */
+/* ============================================================ */
+.attention-banner {
+  width: 100%;
+  background: rgba(245, 158, 11, 0.08);
+  border: 1.5px solid rgba(245, 158, 11, 0.28);
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  animation: pulseGlow 2.4s ease-in-out infinite;
 }
 
-/* Buttons in QR Step */
-.qr-step .btn-primary {
-  margin-top: 2px;
+.attention-badge {
+  align-self: flex-start;
+  background: #6c63ff;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 3px 10px;
+  border-radius: 20px;
+}
+
+.attention-banner p {
+  margin: 0;
+  font-size: 13px;
+  color: #fde68a;
+  line-height: 1.5;
+}
+
+.attention-banner strong {
+  color: #ffffff;
 }
 
 /* ============================================================ */
-/* FORM STEP */
+/* CONFIRM FORM */
 /* ============================================================ */
-.form-step {
+.confirm-form {
+  width: 100%;
   display: flex;
   flex-direction: column;
   gap: 14px;
 }
 
-.back-btn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: none;
-  border: none;
-  color: #94a3b8;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  padding: 4px 0;
-  width: fit-content;
-  transition: all 0.2s;
-}
-
-.back-btn:hover {
-  color: #ffffff;
-}
-
-.back-btn svg {
-  width: 16px;
-  height: 16px;
-}
-
-/* Order Summary */
-.order-summary {
-  background: rgba(255, 255, 255, 0.04);
-  padding: 14px 18px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-.summary-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 5px 0;
-  font-size: 14px;
-  color: #d1d5db;
-}
-
-.summary-row:not(:last-child) {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-.summary-label {
-  color: #94a3b8;
-  font-weight: 400;
-}
-
-.summary-value {
-  font-weight: 500;
-  color: #f1f5f9;
-}
-
-.summary-value.highlight {
-  color: #6c63ff;
-  font-weight: 700;
-  font-size: 18px;
-}
-
-.summary-value.status-pending {
-  color: #f59e0b;
-  font-weight: 600;
-  font-size: 11px;
-  background: rgba(245, 158, 11, 0.12);
-  padding: 3px 12px;
-  border-radius: 20px;
-  display: inline-block;
-  border: 1px solid rgba(245, 158, 11, 0.15);
-}
-
-/* Form Groups */
 .form-group {
   display: flex;
   flex-direction: column;
@@ -637,9 +460,49 @@
   flex-shrink: 0;
 }
 
-/* Error & Success Boxes */
-.error-box,
-.success-box {
+/* UTR help toggle */
+.utr-help-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  color: #6c63ff;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 3px 0;
+  margin-top: 5px;
+}
+
+.utr-help-toggle:hover {
+  color: #8b83ff;
+  text-decoration: underline;
+}
+
+.utr-help-toggle svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.utr-help-box {
+  margin-top: 6px;
+  padding: 10px 12px;
+  background: rgba(108, 99, 255, 0.06);
+  border: 1px solid rgba(108, 99, 255, 0.12);
+  border-radius: 8px;
+  font-size: 12px;
+  color: #cbd5e1;
+  line-height: 1.5;
+}
+
+.utr-help-box strong {
+  color: #f1f5f9;
+}
+
+/* Error Box */
+.error-box {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -647,22 +510,12 @@
   border-radius: 10px;
   font-size: 13px;
   line-height: 1.5;
-}
-
-.error-box {
   background: rgba(239, 68, 68, 0.1);
   color: #fca5a5;
   border: 1px solid rgba(239, 68, 68, 0.15);
 }
 
-.success-box {
-  background: rgba(16, 185, 129, 0.1);
-  color: #6ee7b7;
-  border: 1px solid rgba(16, 185, 129, 0.15);
-}
-
-.error-box svg,
-.success-box svg {
+.error-box svg {
   width: 18px;
   height: 18px;
   flex-shrink: 0;
@@ -675,7 +528,9 @@
   margin-top: 2px;
 }
 
-/* Buttons */
+/* ============================================================ */
+/* BUTTONS */
+/* ============================================================ */
 .btn-primary {
   display: flex;
   align-items: center;
@@ -766,6 +621,47 @@
 }
 
 /* ============================================================ */
+/* SUCCESS SCREEN */
+/* ============================================================ */
+.success-full {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+  padding: 20px 6px;
+}
+
+.success-icon-circle {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.success-icon-circle svg {
+  width: 28px;
+  height: 28px;
+}
+
+.success-full h3 {
+  margin: 0;
+  color: #ffffff;
+  font-size: 18px;
+}
+
+.success-full p {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* ============================================================ */
 /* ANIMATIONS */
 /* ============================================================ */
 @keyframes fadeIn {
@@ -786,6 +682,11 @@
 
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.22); }
+  50% { box-shadow: 0 0 0 6px rgba(245, 158, 11, 0); }
 }
 
 /* ============================================================ */
@@ -812,48 +713,38 @@ body.modal-open {
     margin: auto;
     max-height: 92vh;
   }
-  
+
   .payment-modal-header {
     padding: 16px 18px;
   }
-  
+
   .payment-modal-title {
     font-size: 18px;
   }
-  
+
   .payment-modal-body {
     padding: 18px;
   }
-  
+
   .item-amount {
     font-size: 32px;
   }
-  
+
   .item-amount::before {
     font-size: 22px;
   }
-  
+
   .qr-container {
     max-width: 180px;
     padding: 14px;
   }
-  
+
   .qr-image {
     max-width: 152px;
   }
-  
+
   .upi-id {
     font-size: 14px;
-  }
-  
-  .step-dot {
-    width: 24px;
-    height: 24px;
-    font-size: 10px;
-  }
-  
-  .instruction-step {
-    font-size: 12px;
   }
 }
 
@@ -864,249 +755,163 @@ body.modal-open {
   .payment-modal-overlay {
     padding: 8px;
   }
-  
+
   .payment-modal {
     border-radius: 16px;
     margin: auto;
     max-height: 96vh;
     max-width: 100%;
   }
-  
+
   .payment-modal-header {
     padding: 14px 16px;
     border-radius: 16px 16px 0 0;
   }
-  
+
   .payment-modal-title {
     font-size: 16px;
   }
-  
+
   .payment-modal-close {
     width: 32px;
     height: 32px;
   }
-  
+
   .payment-modal-close svg {
     width: 18px;
     height: 18px;
   }
-  
+
   .payment-modal-body {
     padding: 14px;
+    gap: 14px;
   }
-  
+
   .item-name {
     font-size: 13px;
   }
-  
+
   .item-amount {
     font-size: 28px;
   }
-  
+
   .item-amount::before {
     font-size: 18px;
   }
-  
+
   .qr-container {
     max-width: 160px;
     padding: 12px;
     border-radius: 12px;
   }
-  
+
   .qr-image {
     max-width: 136px;
   }
-  
+
   .upi-details {
     padding: 10px 14px;
   }
-  
+
   .upi-id {
     font-size: 13px;
   }
-  
+
   .copy-btn {
     font-size: 10px;
     padding: 4px 10px;
   }
-  
+
   .copy-btn svg {
     width: 12px;
     height: 12px;
   }
-  
-  .upi-hint {
+
+  .attention-banner p {
+    font-size: 12px;
+  }
+
+  .utr-help-box {
     font-size: 11px;
   }
-  
-  .qr-step {
-    gap: 14px;
+
+  .confirm-form {
+    gap: 12px;
   }
-  
-  .form-step {
-    gap: 14px;
-  }
-  
+
   .form-actions {
     flex-direction: column-reverse;
     gap: 8px;
   }
-  
+
   .btn-primary,
   .btn-secondary {
     padding: 12px 16px;
     font-size: 14px;
     border-radius: 8px;
   }
-  
+
   .btn-primary svg {
     width: 16px;
     height: 16px;
   }
-  
+
   .btn-secondary {
     border-width: 1.5px;
   }
-  
-  .order-summary {
-    padding: 12px 14px;
-  }
-  
-  .summary-row {
-    font-size: 13px;
-    padding: 4px 0;
-  }
-  
-  .summary-value.highlight {
-    font-size: 16px;
-  }
-  
-  .summary-value.status-pending {
-    font-size: 10px;
-    padding: 2px 10px;
-  }
-  
+
   .form-label {
     font-size: 13px;
   }
-  
+
   .form-input {
     padding: 10px 12px;
     font-size: 13px;
     border-radius: 8px;
   }
-  
+
   .input-hint {
     font-size: 10px;
   }
-  
+
   .error-message {
     font-size: 12px;
   }
-  
-  .error-box,
-  .success-box {
+
+  .error-box {
     font-size: 12px;
     padding: 8px 12px;
   }
-  
-  .error-box svg,
-  .success-box svg {
+
+  .error-box svg {
     width: 16px;
     height: 16px;
   }
-  
+
   .form-footer {
     font-size: 11px;
     padding: 6px 10px;
   }
-  
-  .back-btn {
-    font-size: 12px;
-  }
-  
-  .back-btn svg {
-    width: 14px;
-    height: 14px;
-  }
-  
+
   .spinner {
     width: 18px;
     height: 18px;
     border-width: 2px;
   }
-  
-  /* Trust Badge Mobile */
+
   .trust-badge {
     font-size: 10px;
     padding: 4px 12px;
     gap: 6px;
   }
-  
+
   .trust-badge svg {
     width: 12px;
     height: 12px;
   }
-  
-  /* Step Indicator Mobile */
-  .step-dot {
-    width: 22px;
-    height: 22px;
-    font-size: 9px;
-  }
-  
-  .step-label {
-    font-size: 8px;
-  }
-  
-  .step-line {
-    max-width: 30px;
-  }
-  
-  .step-indicator {
-    max-width: 160px;
-  }
-  
-  .step-labels {
-    max-width: 160px;
-  }
-  
-  /* Instructions Mobile */
-  .instructions-box {
-    padding: 10px 12px;
-  }
-  
-  .instruction-step {
-    font-size: 12px;
-    gap: 8px;
-  }
-  
-  .instruction-number {
-    width: 18px;
-    height: 18px;
-    font-size: 9px;
-  }
-  
-  /* Trust Message Mobile */
-  .trust-message {
-    font-size: 11px;
-    padding: 8px 12px;
-  }
-  
-  .trust-message svg {
-    width: 14px;
-    height: 14px;
-  }
-  
-  .trust-message.small {
+
+  .pay-hint-small {
     font-size: 10px;
-    padding: 6px 10px;
-  }
-  
-  /* Form Instruction Mobile */
-  .form-instruction {
-    font-size: 12px;
-    padding: 6px 12px;
   }
 }
 
@@ -1117,113 +922,69 @@ body.modal-open {
   .payment-modal-overlay {
     padding: 4px;
   }
-  
+
   .payment-modal {
     border-radius: 12px;
     max-height: 98vh;
   }
-  
+
   .payment-modal-header {
     padding: 10px 12px;
   }
-  
+
   .payment-modal-title {
     font-size: 14px;
   }
-  
+
   .payment-modal-body {
     padding: 10px;
   }
-  
+
   .item-name {
     font-size: 12px;
   }
-  
+
   .item-amount {
     font-size: 24px;
   }
-  
+
   .item-amount::before {
     font-size: 16px;
   }
-  
+
   .qr-container {
     max-width: 140px;
     padding: 10px;
   }
-  
+
   .qr-image {
     max-width: 120px;
   }
-  
+
   .upi-id {
     font-size: 11px;
   }
-  
+
   .copy-btn {
     font-size: 9px;
     padding: 3px 8px;
   }
-  
+
   .btn-primary,
   .btn-secondary {
     padding: 10px 12px;
     font-size: 13px;
   }
-  
-  .order-summary {
-    padding: 10px 12px;
-  }
-  
-  .summary-row {
-    font-size: 12px;
-  }
-  
-  .summary-value.highlight {
-    font-size: 14px;
-  }
-  
+
   .form-input {
     padding: 8px 10px;
     font-size: 12px;
   }
-  
+
   .form-label {
     font-size: 12px;
   }
-  
-  .step-dot {
-    width: 20px;
-    height: 20px;
-    font-size: 8px;
-  }
-  
-  .step-label {
-    font-size: 7px;
-  }
-  
-  .step-indicator {
-    max-width: 140px;
-  }
-  
-  .step-labels {
-    max-width: 140px;
-  }
-  
-  .step-line {
-    max-width: 24px;
-  }
-  
-  .instruction-step {
-    font-size: 11px;
-  }
-  
-  .instruction-number {
-    width: 16px;
-    height: 16px;
-    font-size: 8px;
-  }
-  
+
   .trust-badge {
     font-size: 9px;
     padding: 3px 10px;
@@ -1238,89 +999,71 @@ body.modal-open {
     background: #0f172a;
     border-color: rgba(255, 255, 255, 0.06);
   }
-  
+
   .payment-modal-header {
     background: #0f172a;
     border-bottom-color: rgba(255, 255, 255, 0.05);
   }
-  
+
   .payment-modal-title {
     color: #f1f5f9;
   }
-  
+
   .payment-modal-close {
     color: #64748b;
   }
-  
+
   .payment-modal-close:hover:not(:disabled) {
     background: rgba(255, 255, 255, 0.08);
     color: #f1f5f9;
   }
-  
+
   .item-name {
     color: #94a3b8;
   }
-  
+
   .upi-details {
     background: rgba(255, 255, 255, 0.03);
     border-color: rgba(255, 255, 255, 0.05);
   }
-  
+
   .upi-id {
     color: #e2e8f0;
   }
-  
-  .order-summary {
-    background: rgba(255, 255, 255, 0.03);
-    border-color: rgba(255, 255, 255, 0.05);
-  }
-  
-  .summary-row {
-    color: #cbd5e1;
-  }
-  
-  .summary-value {
-    color: #e2e8f0;
-  }
-  
+
   .form-input {
     background: rgba(255, 255, 255, 0.03);
     color: #e2e8f0;
   }
-  
+
   .form-input:focus {
     background: rgba(255, 255, 255, 0.05);
   }
-  
+
   .btn-secondary {
     background: rgba(255, 255, 255, 0.03);
     color: #cbd5e1;
     border-color: rgba(255, 255, 255, 0.08);
   }
-  
+
   .btn-secondary:hover:not(:disabled) {
     background: rgba(255, 255, 255, 0.06);
   }
-  
+
   .form-footer {
     background: rgba(255, 255, 255, 0.02);
     border-color: rgba(255, 255, 255, 0.04);
     color: #94a3b8;
   }
-  
-  .instructions-box {
-    background: rgba(255, 255, 255, 0.02);
-    border-color: rgba(255, 255, 255, 0.04);
-  }
-  
-  .trust-message {
-    background: rgba(245, 158, 11, 0.04);
-    border-color: rgba(245, 158, 11, 0.06);
-  }
-  
-  .form-instruction {
+
+  .utr-help-box {
     background: rgba(108, 99, 255, 0.04);
-    border-color: rgba(108, 99, 255, 0.06);
+    border-color: rgba(108, 99, 255, 0.08);
+  }
+
+  .attention-banner {
+    background: rgba(245, 158, 11, 0.05);
+    border-color: rgba(245, 158, 11, 0.18);
   }
 }
 
@@ -1332,7 +1075,7 @@ body.modal-open {
     /* Fix for Safari on iOS */
     height: -webkit-fill-available;
   }
-  
+
   .payment-modal {
     /* Fix for Safari on iOS */
     max-height: 85vh;

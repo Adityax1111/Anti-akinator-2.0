@@ -71,7 +71,7 @@ const BuyShards = () => {
   };
 
   const handleQRSuccess = (data) => {
-    setSuccess(`✅ Payment verification submitted for ${selectedPack.shards} Shards! We will verify and add them to your account.`);
+    setSuccess(`✅ Payment submitted for ${selectedPack.shards} Shards! We'll verify it and add them to your account within 24 hours.`);
     setSelectedPack(null);
     setAgreed(false);
   };
@@ -167,12 +167,12 @@ const BuyShards = () => {
             onClick={handleQRPayment}
             disabled={!agreed || loading}
           >
-            {loading ? 'Processing...' : `Pay ${selectedPack.price} via QR Code`}
+            {loading ? 'Processing...' : `Pay ${selectedPack.price} Now`}
           </button>
         </div>
       )}
 
-      {/* QR Payment Modal */}
+      {/* Payment Modal - single screen: pay + confirm UTR */}
       {user && selectedPack && (
         <PaymentQRModal
           isOpen={showQRModal}

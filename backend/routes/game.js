@@ -13,51 +13,28 @@ const { askAI } = require('../utils/aiRouter');
 const router = express.Router();
 
 // ============================================================
-// 🧠 SMART MATCHING ENGINE - Handles ANY spelling mistake
+// 🧠 SMART ANSWER ENGINE
+//   Order of operations for every question:
+//   1. Is the player trying to guess the character's actual name? -> "Maybe"
+//   2. Can we answer with 100% certainty from OUR OWN structured data
+//      (gender, alive/dead, species, or a direct keyword hit anywhere
+//      in the character sheet)? -> answer directly, no AI call needed.
+//   3. Otherwise, ask the AI to reason it out using the full character
+//      sheet + its general anime knowledge.
 // ============================================================
-
-// ===== HELPER: Check if words match with spelling tolerance =====
-function isSimilarWord(word1, word2) {
-  if (!word1 || !word2) return false;
-  
-  const w1 = word1.toLowerCase().trim();
-  const w2 = word2.toLowerCase().trim();
-  
-  // Exact match
-  if (w1 === w2) return true;
-  
-  // Check if one is a substring of the other (for longer words)
-  if (w1.length > 3 && w2.length > 3) {
-    if (w1.includes(w2) || w2.includes(w1)) return true;
-  }
-  
-  // Calculate Levenshtein distance
-  const distance = levenshteinDistance(w1, w2);
-  const maxLength = Math.max(w1.length, w2.length);
-  
-  // If 70% similar, consider it a match (more forgiving)
-  const similarity = (maxLength - distance) / maxLength;
-  return similarity >= 0.7;
-}
 
 // ===== HELPER: Levenshtein Distance (spelling tolerance) =====
 function levenshteinDistance(str1, str2) {
   const len1 = str1.length;
   const len2 = str2.length;
-  
+
   if (len1 === 0) return len2;
   if (len2 === 0) return len1;
-  
+
   const matrix = [];
-  
-  for (let i = 0; i <= len1; i++) {
-    matrix[i] = [i];
-  }
-  
-  for (let j = 0; j <= len2; j++) {
-    matrix[0][j] = j;
-  }
-  
+  for (let i = 0; i <= len1; i++) matrix[i] = [i];
+  for (let j = 0; j <= len2; j++) matrix[0][j] = j;
+
   for (let i = 1; i <= len1; i++) {
     for (let j = 1; j <= len2; j++) {
       const cost = str1[i - 1] === str2[j - 1] ? 0 : 1;
@@ -68,84 +45,60 @@ function levenshteinDistance(str1, str2) {
       );
     }
   }
-  
+
   return matrix[len1][len2];
 }
 
-// ===== HELPER: Check if question is trying to reveal identity =====
-function isIdentityRevealQuestion(question) {
-  const lower = question.toLowerCase();
-  
-  // Name reveal patterns
-  const namePatterns = [
-    /is it (.+?)\?/,
-    /is he (.+?)\?/,
-    /is she (.+?)\?/,
-    /is this (.+?)\?/,
-    /is that (.+?)\?/,
-    /is the character (.+?)\?/,
-    /are you (.+?)\?/,
-    /is his name (.+?)\?/,
-    /is her name (.+?)\?/,
-    /is its name (.+?)\?/,
-    /is the name (.+?)\?/,
-    /is your name (.+?)\?/,
-    /is the person (.+?)\?/,
-    /is this person (.+?)\?/,
-    /is the one (.+?)\?/,
-    /is he the (.+?)\?/,
-    /is she the (.+?)\?/,
-    /is it the (.+?)\?/,
-    /character is (.+?)\?/,
-    /name is (.+?)\?/,
-    /called (.+?)\?/,
-    /known as (.+?)\?/
-  ];
-  
-  for (const pattern of namePatterns) {
-    if (pattern.test(lower)) {
-      return true;
-    }
+// ===== HELPER: Check if two words match with spelling tolerance =====
+// Only meaningful for words of length >= 3 - short words (he, is, no...)
+// are too noisy for fuzzy matching and cause false positives.
+function isSimilarWord(word1, word2) {
+  if (!word1 || !word2) return false;
+
+  const w1 = word1.toLowerCase().trim();
+  const w2 = word2.toLowerCase().trim();
+
+  if (w1.length < 3 || w2.length < 3) return w1 === w2;
+
+  if (w1 === w2) return true;
+
+  if (w1.length > 3 && w2.length > 3) {
+    if (w1.includes(w2) || w2.includes(w1)) return true;
   }
-  
-  // Identity reveal keywords
-  const identityKeywords = [
-    'who is it',
-    'who is he',
-    'who is she',
-    'who is this',
-    'what is his name',
-    'what is her name',
-    'what is the name',
-    'tell me the name',
-    'reveal the name',
-    'guess who',
-    'who am i thinking of',
-    'what character is this',
-    'which character',
-    'who are you'
-  ];
-  
-  for (const keyword of identityKeywords) {
-    if (lower.includes(keyword)) {
-      return true;
-    }
-  }
-  
-  return false;
+
+  const distance = levenshteinDistance(w1, w2);
+  const maxLength = Math.max(w1.length, w2.length);
+  const similarity = (maxLength - distance) / maxLength;
+  return similarity >= 0.75;
 }
 
-// ===== HELPER: Get all text from character data =====
+// ===== HELPER: Common words to skip when scanning a question =====
+const skipWords = [
+  'is', 'he', 'she', 'it', 'they', 'are', 'am', 'the', 'this', 'that',
+  'his', 'her', 'their', 'them', 'what', 'who', 'when', 'where', 'why',
+  'how', 'yes', 'no', 'maybe', 'idk', 'from', 'with', 'has', 'have',
+  'does', 'do', 'did', 'was', 'were', 'been', 'being', 'can', 'will',
+  'would', 'could', 'should', 'may', 'might', 'must', 'shall',
+  'for', 'about', 'into', 'through', 'during', 'without', 'against',
+  'between', 'among', 'upon', 'toward', 'until', 'since', 'of', 'to',
+  'on', 'at', 'by', 'in', 'up', 'etc', 'eg', 'ie', 'and', 'or', 'but',
+  'nor', 'yet', 'so', 'as', 'than', 'like', 'just', 'even',
+  'though', 'although', 'while', 'whereas', 'wherever', 'whenever',
+  'whoever', 'whichever', 'whatever', 'however', 'nevertheless',
+  'nonetheless', 'accordingly', 'consequently', 'hence', 'thence',
+  'your', 'you', 'ur', 'my', 'our', 'not', 'use', 'uses', 'used',
+  'have', 'having', 'got', 'get'
+];
+
+// ===== HELPER: Get every piece of text we have on a character =====
 function getAllCharacterText(character) {
   const texts = [];
-  
-  // Basic info (EXCLUDING name and anime - these reveal identity)
+
   if (character.description) texts.push(character.description);
   if (character.crucialHint) texts.push(character.crucialHint);
   if (character.element) texts.push(character.element);
   if (character.rarity) texts.push(character.rarity);
-  
-  // Appearance
+
   if (character.appearance) {
     if (character.appearance.hairColor) texts.push(character.appearance.hairColor);
     if (character.appearance.eyeColor) texts.push(character.appearance.eyeColor);
@@ -156,23 +109,20 @@ function getAllCharacterText(character) {
     if (character.appearance.clothing) texts.push(character.appearance.clothing);
     if (character.appearance.accessories) texts.push(character.appearance.accessories);
   }
-  
-  // Identity (EXCLUDING exact name, but including traits)
+
   if (character.identity) {
     if (character.identity.gender) texts.push(character.identity.gender);
-    if (character.identity.age) texts.push(character.identity.age);
+    if (character.identity.age) texts.push(String(character.identity.age));
     if (character.identity.species) texts.push(character.identity.species);
     if (character.identity.nationality) texts.push(character.identity.nationality);
     if (character.identity.occupation) texts.push(character.identity.occupation);
   }
-  
-  // Status
+
   if (character.status) {
     if (character.status.currentStatus) texts.push(character.status.currentStatus);
     if (character.status.deathDetails) texts.push(character.status.deathDetails);
   }
-  
-  // Personality
+
   if (character.personality) {
     if (character.personality.traits) texts.push(...character.personality.traits);
     if (character.personality.likes) texts.push(...character.personality.likes);
@@ -180,8 +130,7 @@ function getAllCharacterText(character) {
     if (character.personality.goals) texts.push(character.personality.goals);
     if (character.personality.fears) texts.push(character.personality.fears);
   }
-  
-  // Abilities
+
   if (character.abilities) {
     if (character.abilities.powers) texts.push(...character.abilities.powers);
     if (character.abilities.techniques) texts.push(...character.abilities.techniques);
@@ -189,8 +138,7 @@ function getAllCharacterText(character) {
     if (character.abilities.fightingStyle) texts.push(character.abilities.fightingStyle);
     if (character.abilities.specialAbilities) texts.push(character.abilities.specialAbilities);
   }
-  
-  // Relationships
+
   if (character.relationships) {
     if (character.relationships.family) texts.push(character.relationships.family);
     if (character.relationships.friends) texts.push(...character.relationships.friends);
@@ -200,8 +148,7 @@ function getAllCharacterText(character) {
     if (character.relationships.master) texts.push(character.relationships.master);
     if (character.relationships.affiliatedGroups) texts.push(...character.relationships.affiliatedGroups);
   }
-  
-  // Background
+
   if (character.background) {
     if (character.background.origin) texts.push(character.background.origin);
     if (character.background.backstory) texts.push(character.background.backstory);
@@ -209,8 +156,7 @@ function getAllCharacterText(character) {
     if (character.background.achievements) texts.push(...character.background.achievements);
     if (character.background.notableFights) texts.push(...character.background.notableFights);
   }
-  
-  // Traits
+
   if (character.traits) {
     if (character.traits.gender) texts.push(character.traits.gender);
     if (character.traits.species) texts.push(character.traits.species);
@@ -221,71 +167,17 @@ function getAllCharacterText(character) {
     if (character.traits.relationships) texts.push(...character.traits.relationships);
     if (character.traits.keyEvents) texts.push(...character.traits.keyEvents);
   }
-  
-  // Attributes (convert booleans to text)
+
   if (character.attributes) {
     for (const key in character.attributes) {
       if (character.attributes[key] === true) {
         const readableName = key.replace(/([A-Z])/g, ' $1').trim();
         texts.push(readableName);
-        texts.push('yes');
       }
     }
   }
-  
-  // Clean and return unique values
+
   return [...new Set(texts.filter(t => t && typeof t === 'string' && t.length > 0))];
-}
-
-// ===== HELPER: Common words to skip =====
-const skipWords = [
-  'is', 'he', 'she', 'it', 'they', 'are', 'am', 'the', 'this', 'that',
-  'his', 'her', 'their', 'them', 'what', 'who', 'when', 'where', 'why',
-  'how', 'yes', 'no', 'maybe', 'idk', 'from', 'with', 'has', 'have',
-  'does', 'do', 'did', 'was', 'were', 'been', 'being', 'can', 'will',
-  'would', 'could', 'should', 'may', 'might', 'must', 'shall',
-  'for', 'about', 'into', 'through', 'during', 'without', 'against',
-  'between', 'among', 'upon', 'toward', 'until', 'since', 'of', 'to',
-  'on', 'at', 'by', 'in', 'up', 'etc', 'eg', 'ie', 'and', 'or', 'but',
-  'nor', 'for', 'yet', 'so', 'as', 'than', 'like', 'just', 'even',
-  'though', 'although', 'while', 'whereas', 'wherever', 'whenever',
-  'whoever', 'whichever', 'whatever', 'however', 'nevertheless',
-  'nonetheless', 'accordingly', 'consequently', 'hence', 'thence'
-];
-
-// ===== HELPER: Smart answer function =====
-function getSmartAnswer(question, character) {
-  // ✅ IMPORTANT: If it's an identity reveal question, return false immediately
-  if (isIdentityRevealQuestion(question)) {
-    return { match: false, isIdentityQuestion: true };
-  }
-  
-  const questionWords = question.toLowerCase()
-    .replace(/[^a-zA-Z0-9\s']/g, ' ')
-    .split(' ')
-    .filter(w => w.length > 1);
-  
-  // Get all character data as text
-  const allTexts = getAllCharacterText(character);
-  
-  // Get all important keywords from character
-  const keywords = allTexts.map(t => t.toLowerCase());
-  
-  // Check if ANY question word matches ANY keyword (with spelling tolerance)
-  for (const word of questionWords) {
-    // Skip common words
-    if (skipWords.includes(word)) {
-      continue;
-    }
-    
-    for (const keyword of keywords) {
-      if (isSimilarWord(word, keyword)) {
-        return { match: true, matchedWord: keyword, userWord: word, isIdentityQuestion: false };
-      }
-    }
-  }
-  
-  return { match: false, isIdentityQuestion: false };
 }
 
 // ===== HELPER: Normalize string for flexible matching =====
@@ -301,6 +193,266 @@ function normalize(str) {
 function sanitizeInput(str) {
   if (!str) return '';
   return str.replace(/[<>]/g, '').trim();
+}
+
+// ===== HELPER: Split a question into meaningful words =====
+function extractQuestionWords(question) {
+  return question
+    .toLowerCase()
+    .replace(/[^a-z0-9\s']/g, ' ')
+    .split(/\s+/)
+    .filter(w => w.length > 0 && !skipWords.includes(w));
+}
+
+// ============================================================
+// CHARACTER NAME CACHE (used to detect "are you trying to guess
+// the name directly" questions without false-positiving on every
+// ordinary "is he/she/it ___?" question)
+// ============================================================
+let characterNamesCache = { names: [], lastFetched: 0 };
+const NAME_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+async function getAllCharacterNames() {
+  const now = Date.now();
+  if (characterNamesCache.names.length === 0 || (now - characterNamesCache.lastFetched) > NAME_CACHE_TTL_MS) {
+    try {
+      characterNamesCache.names = await Character.distinct('name');
+      characterNamesCache.lastFetched = now;
+    } catch (e) {
+      // If the lookup fails, fall back to whatever we had cached (possibly empty)
+    }
+  }
+  return characterNamesCache.names;
+}
+
+// ===== Identity-reveal detection (FIXED) =====
+// The old version used regexes like /is he (.+?)\?/ which matched almost
+// ANY question ("is he marine?", "is she a girl?"), silently forcing IDK
+// on completely ordinary attribute questions. This version only flags a
+// question as an identity-guess when it either (a) explicitly asks for
+// a name/identity in general terms, or (b) actually contains a word that
+// fuzzy-matches a real character name in your database.
+function isIdentityRevealQuestion(question, allCharacterNames = []) {
+  const lower = question.toLowerCase().trim();
+
+  const identityPhrases = [
+    'who is it', 'who is he', 'who is she', 'who is this', 'who is that',
+    'who is the character', 'who is your character',
+    'what is his name', 'what is her name', 'what is its name', 'what is the name',
+    'what is your name', "what's his name", "what's her name", "what's the name",
+    "what's his real name", 'tell me the name', 'tell me who', 'reveal the name',
+    'reveal who', 'guess who', 'who am i thinking', 'which character is this',
+    'which character is it', 'what character is this', 'what character is it',
+    'who are you'
+  ];
+
+  for (const phrase of identityPhrases) {
+    if (lower.includes(phrase)) return true;
+  }
+
+  // Does the question actually contain a real character name from the DB?
+  const words = extractQuestionWords(lower).filter(w => w.length >= 3);
+  if (words.length === 0) return false;
+
+  for (const name of allCharacterNames) {
+    const nameWords = name.toLowerCase().split(/\s+/).filter(w => w.length >= 3);
+    for (const nameWord of nameWords) {
+      for (const w of words) {
+        if (isSimilarWord(w, nameWord)) {
+          return true;
+        }
+      }
+    }
+  }
+
+  return false;
+}
+
+// ============================================================
+// DETERMINISTIC ANSWER ENGINE
+// Answers straight from the character sheet whenever we can be
+// certain - this never depends on the AI, so it's always accurate
+// and instant. Returns 'Yes' | 'No' | null (null = "ask the AI").
+// ============================================================
+function getDeterministicAnswer(question, character) {
+  const words = extractQuestionWords(question);
+  if (words.length === 0) return null;
+
+  // ---- Gender (every character has one - safe to answer both ways) ----
+  const gender = (character.identity?.gender || character.traits?.gender || '').toLowerCase();
+  const explicitFemaleWords = ['girl', 'female', 'woman', 'women', 'lady', 'gal'];
+  const explicitMaleWords = ['boy', 'male', 'man', 'men', 'guy', 'dude'];
+
+  if (gender) {
+    if (words.some(w => explicitFemaleWords.includes(w))) {
+      return gender.includes('female') ? 'Yes' : 'No';
+    }
+    if (words.some(w => explicitMaleWords.includes(w))) {
+      return (gender.includes('male') && !gender.includes('female')) ? 'Yes' : 'No';
+    }
+  }
+
+  // ---- Alive / Dead (every character has a status - safe both ways) ----
+  const statusStr = (character.status?.currentStatus || '').toLowerCase();
+  const deceasedFlag = character.status?.deceased === true
+    || character.status?.isDeceased === true
+    || statusStr.includes('dead')
+    || statusStr.includes('deceased');
+  const aliveFlag = character.status?.isAlive === true || statusStr.includes('alive');
+  const statusKnown = deceasedFlag || aliveFlag;
+
+  if (statusKnown) {
+    if (words.some(w => ['alive', 'living', 'live'].includes(w))) {
+      return deceasedFlag ? 'No' : 'Yes';
+    }
+    if (words.some(w => ['dead', 'deceased', 'die', 'died', 'killed'].includes(w))) {
+      return deceasedFlag ? 'Yes' : 'No';
+    }
+  }
+
+  // ---- Species / "is X human?" (safe both ways when species is known) ----
+  const species = (character.identity?.species || character.traits?.species || '').toLowerCase();
+  if (species && words.includes('human')) {
+    return species.includes('human') ? 'Yes' : 'No';
+  }
+
+  // ---- General keyword hit anywhere in the character sheet ----
+  // If the player's word (or something close to it) genuinely appears in
+  // OUR data about this character, the answer is definitely "Yes".
+  // We do NOT infer "No" from absence here (the admin's notes are never
+  // 100% exhaustive) - absence just means "let the AI reason about it".
+  const allTexts = getAllCharacterText(character);
+  const combinedText = allTexts.join(' | ').toLowerCase();
+  const textWords = combinedText.split(/[^a-z0-9']+/).filter(w => w.length >= 3);
+
+  for (const word of words) {
+    if (word.length < 3) continue;
+    if (combinedText.includes(word)) {
+      return 'Yes';
+    }
+    for (const tw of textWords) {
+      if (isSimilarWord(word, tw)) {
+        return 'Yes';
+      }
+    }
+  }
+
+  return null;
+}
+
+// ============================================================
+// AI PROMPT + PARSING
+// ============================================================
+const SYSTEM_PROMPT = `You are an expert anime encyclopedia AI acting as the host of a 20-questions style guessing game.
+
+Your job: answer a Yes/No/Maybe/IDK question about a hidden anime character, using the CHARACTER DATA provided plus your own accurate canon knowledge of that anime.
+
+RULES:
+1. Base your answer on the CHARACTER DATA first.
+2. If a field is "Unknown" or doesn't cover the question, use your real knowledge of that specific anime/character to deduce the correct answer. Only answer confidently if you actually know the canon fact - do not guess randomly.
+3. Respect mutually exclusive categories (e.g. a Pirate is not a Marine; a character marked Deceased cannot be "alive"; a character with no Devil Fruit mentioned should be answered based on canon knowledge, not assumed).
+4. Use "Maybe" only when the true answer is genuinely ambiguous, partially true, or changed over the course of the story.
+5. Use "IDK" only when the fact is truly unknowable / never established in canon - this should be rare.
+6. Never reveal or mention the character's actual name in your reasoning.
+7. Output STRICT JSON only, nothing else - no markdown, no code fences, no commentary: {"answer": "Yes" | "No" | "Maybe" | "IDK", "reason": "brief reason"}`;
+
+function buildCharacterContext(character, question) {
+  const statusText = character.status?.currentStatus
+    || (character.status?.deceased || character.status?.isDeceased ? 'Deceased' : 'Alive');
+
+  return `
+===== CHARACTER DATA (READ CAREFULLY) =====
+Name: ${character.name} (CONFIDENTIAL - never reveal this)
+Anime: ${character.anime}
+
+===== IDENTITY =====
+Gender: ${character.identity?.gender || character.traits?.gender || 'Unknown'}
+Age: ${character.identity?.age || character.traits?.age || 'Unknown'}
+Species: ${character.identity?.species || character.traits?.species || 'Unknown'}
+Occupation: ${character.identity?.occupation || character.traits?.occupation || 'Unknown'}
+Nationality: ${character.identity?.nationality || 'Unknown'}
+
+===== APPEARANCE =====
+Hair: ${character.appearance?.hairColor || 'Unknown'}
+Eyes: ${character.appearance?.eyeColor || 'Unknown'}
+Skin: ${character.appearance?.skinColor || 'Unknown'}
+Height: ${character.appearance?.height || 'Unknown'}
+Build: ${character.appearance?.build || 'Unknown'}
+Clothing: ${character.appearance?.clothing || 'Unknown'}
+Accessories: ${character.appearance?.accessories || 'Unknown'}
+Distinctive Features: ${character.appearance?.distinctiveFeatures || 'Unknown'}
+
+===== STATUS =====
+Current Status: ${statusText}
+Death Details: ${character.status?.deathDetails || 'N/A'}
+
+===== PERSONALITY =====
+Traits: ${character.personality?.traits?.join(', ') || 'Unknown'}
+Likes: ${character.personality?.likes?.join(', ') || 'Unknown'}
+Dislikes: ${character.personality?.dislikes?.join(', ') || 'Unknown'}
+Goals: ${character.personality?.goals || 'Unknown'}
+Fears: ${character.personality?.fears || 'Unknown'}
+
+===== ABILITIES =====
+Powers: ${character.abilities?.powers?.join(', ') || 'None'}
+Techniques: ${character.abilities?.techniques?.join(', ') || 'None'}
+Weapons: ${character.abilities?.weapons?.join(', ') || 'None'}
+Fighting Style: ${character.abilities?.fightingStyle || 'Unknown'}
+Special Abilities: ${character.abilities?.specialAbilities || 'Unknown'}
+
+===== RELATIONSHIPS =====
+Family: ${character.relationships?.family || 'Unknown'}
+Friends: ${character.relationships?.friends?.join(', ') || 'None'}
+Rivals: ${character.relationships?.rivals?.join(', ') || 'None'}
+Mentors: ${character.relationships?.mentors?.join(', ') || 'None'}
+Master: ${character.relationships?.master || 'None'}
+Affiliated Groups: ${character.relationships?.affiliatedGroups?.join(', ') || 'None'}
+
+===== BACKGROUND =====
+Origin: ${character.background?.origin || 'Unknown'}
+Backstory: ${character.background?.backstory || 'Unknown'}
+Key Events: ${character.background?.keyEvents?.join(', ') || 'Unknown'}
+Achievements: ${character.background?.achievements?.join(', ') || 'Unknown'}
+
+===== DESCRIPTION =====
+${character.description || 'Unknown'}
+
+===== USER QUESTION =====
+"${question}"
+
+===== YOUR TASK =====
+Answer the yes/no/maybe question above about "${character.name}" from "${character.anime}", using the data given plus your real knowledge of this anime. Never reveal the name "${character.name}". Reply with STRICT JSON ONLY: {"answer": "Yes", "reason": "short reason"}
+`;
+}
+
+// Robust parsing: try JSON first, then fall back to whole-word text scanning
+// instead of collapsing straight to IDK the moment the model adds one stray
+// character around its JSON.
+function parseAIAnswer(rawAnswer) {
+  if (!rawAnswer || typeof rawAnswer !== 'string') return 'IDK';
+
+  const jsonMatch = rawAnswer.match(/\{[\s\S]*?\}/);
+  if (jsonMatch) {
+    try {
+      const parsed = JSON.parse(jsonMatch[0]);
+      if (parsed && parsed.answer) {
+        const a = String(parsed.answer).toLowerCase().trim();
+        if (a === 'yes') return 'Yes';
+        if (a === 'no') return 'No';
+        if (a === 'maybe') return 'Maybe';
+        if (a === 'idk') return 'IDK';
+      }
+    } catch (e) {
+      // fall through to text scanning below
+    }
+  }
+
+  const text = rawAnswer.toLowerCase();
+  if (/\bno\b/.test(text)) return 'No';
+  if (/\byes\b/.test(text)) return 'Yes';
+  if (/\bmaybe\b/.test(text)) return 'Maybe';
+
+  return 'IDK';
 }
 
 // ============================================================
@@ -338,7 +490,7 @@ const validateGuess = [
 router.get('/anime-options', async (req, res) => {
   try {
     const allAnime = await Character.distinct('anime');
-    
+
     if (!allAnime || allAnime.length === 0) {
       return res.status(400).json({
         success: false,
@@ -386,7 +538,7 @@ router.post('/start', async (req, res) => {
     }
 
     const characters = await Character.find({ anime: anime });
-    
+
     if (!characters || characters.length === 0) {
       return res.status(400).json({
         success: false,
@@ -442,7 +594,7 @@ router.post('/start', async (req, res) => {
 });
 
 // ============================================================
-// ASK QUESTION (COMPLETE DATA - NO RESTRICTION)
+// ASK QUESTION
 // ============================================================
 router.post('/question', [...validateGameId, ...validateQuestion], async (req, res) => {
   try {
@@ -459,7 +611,7 @@ router.post('/question', [...validateGameId, ...validateQuestion], async (req, r
     const sanitizedQuestion = sanitizeInput(question);
 
     const game = await GameSession.findById(gameId).populate('character');
-    
+
     if (!game) {
       return res.status(404).json({
         success: false,
@@ -489,8 +641,7 @@ router.post('/question', [...validateGameId, ...validateQuestion], async (req, r
       });
     }
 
-    // ✅ DUPLICATE QUESTION CHECK
-    const isDuplicate = game.questions.some(q => 
+    const isDuplicate = game.questions.some(q =>
       q.question.toLowerCase().trim() === sanitizedQuestion.toLowerCase().trim()
     );
 
@@ -503,263 +654,45 @@ router.post('/question', [...validateGameId, ...validateQuestion], async (req, r
     }
 
     const character = game.character;
+    let finalAnswer;
+    let usedProvider = 'local';
 
-    // ✅ COMPLETE CONTEXT - NO RESTRICTION ON DATA
-    const context = `
-===== COMPLETE CHARACTER DATA (ONLY SOURCE OF TRUTH) =====
-Name: ${character.name} (CONFIDENTIAL - DO NOT REVEAL)
-Anime: ${character.anime}
+    // ---- STEP 1: Is this actually trying to guess the name? ----
+    const allNames = await getAllCharacterNames();
 
-===== APPEARANCE =====
-Hair Color: ${character.appearance?.hairColor || character.traits?.hairColor || 'Not Mentioned'}
-Eye Color: ${character.appearance?.eyeColor || character.traits?.eyeColor || 'Not Mentioned'}
-Skin Color: ${character.appearance?.skinColor || 'Not Mentioned'}
-Height: ${character.appearance?.height || 'Not Mentioned'}
-Build: ${character.appearance?.build || 'Not Mentioned'}
-Distinctive Features: ${character.appearance?.distinctiveFeatures || 'Not Mentioned'}
-Clothing: ${character.appearance?.clothing || 'Not Mentioned'}
-Accessories: ${character.appearance?.accessories || 'Not Mentioned'}
-
-===== IDENTITY =====
-Gender: ${character.identity?.gender || character.traits?.gender || 'Not Mentioned'}
-Age: ${character.identity?.age || character.traits?.age || 'Not Mentioned'}
-Birthday: ${character.identity?.birthday || 'Not Mentioned'}
-Species: ${character.identity?.species || character.traits?.species || 'Not Mentioned'}
-Nationality: ${character.identity?.nationality || 'Not Mentioned'}
-Occupation: ${character.identity?.occupation || character.traits?.occupation || 'Not Mentioned'}
-
-===== STATUS =====
-Alive: ${character.status?.isAlive !== undefined ? (character.status.isAlive ? 'Yes' : 'No') : 'Not Mentioned'}
-Dead: ${character.status?.isDeceased ? 'Yes' : 'No'}
-Death Details: ${character.status?.deathDetails || 'Not Mentioned'}
-Current Status: ${character.status?.currentStatus || 'Not Mentioned'}
-
-===== PERSONALITY =====
-Traits: ${character.personality?.traits?.join(', ') || character.traits?.personality?.join(', ') || 'Not Mentioned'}
-Likes: ${character.personality?.likes?.join(', ') || 'Not Mentioned'}
-Dislikes: ${character.personality?.dislikes?.join(', ') || 'Not Mentioned'}
-Goals: ${character.personality?.goals || 'Not Mentioned'}
-Fears: ${character.personality?.fears || 'Not Mentioned'}
-
-===== ABILITIES & POWERS =====
-Powers: ${character.abilities?.powers?.join(', ') || character.traits?.powers?.join(', ') || 'None Mentioned'}
-Techniques: ${character.abilities?.techniques?.join(', ') || 'None Mentioned'}
-Weapons: ${character.abilities?.weapons?.join(', ') || 'None Mentioned'}
-Fighting Style: ${character.abilities?.fightingStyle || 'Not Mentioned'}
-Special Abilities: ${character.abilities?.specialAbilities || 'Not Mentioned'}
-
-===== RELATIONSHIPS =====
-Family: ${character.relationships?.family || 'Not Mentioned'}
-Friends: ${character.relationships?.friends?.join(', ') || 'None Mentioned'}
-Rivals: ${character.relationships?.rivals?.join(', ') || 'None Mentioned'}
-Mentors: ${character.relationships?.mentors?.join(', ') || 'None Mentioned'}
-Students: ${character.relationships?.students?.join(', ') || 'None Mentioned'}
-Master: ${character.relationships?.master || 'Not Mentioned'}
-Groups: ${character.relationships?.affiliatedGroups?.join(', ') || character.traits?.affiliations?.join(', ') || 'None Mentioned'}
-
-===== BACKGROUND =====
-Origin: ${character.background?.origin || 'Not Mentioned'}
-Backstory: ${character.background?.backstory || 'Not Mentioned'}
-Key Events: ${character.background?.keyEvents?.join(', ') || character.traits?.keyEvents?.join(', ') || 'None Mentioned'}
-Achievements: ${character.background?.achievements?.join(', ') || 'None Mentioned'}
-Notable Fights: ${character.background?.notableFights?.join(', ') || 'None Mentioned'}
-
-===== ATTRIBUTES =====
-Main Character: ${character.attributes?.isMainCharacter ? 'Yes' : 'No'}
-Villain: ${character.attributes?.isVillain ? 'Yes' : 'No'}
-Hero: ${character.attributes?.isHero ? 'Yes' : 'No'}
-Female: ${character.attributes?.isFemale ? 'Yes' : 'No'}
-Child: ${character.attributes?.isChild ? 'Yes' : 'No'}
-Elder: ${character.attributes?.isElder ? 'Yes' : 'No'}
-Has Special Power: ${character.attributes?.hasSpecialPower ? 'Yes' : 'No'}
-Has Weapon: ${character.attributes?.hasWeapon ? 'Yes' : 'No'}
-Has Family: ${character.attributes?.hasFamily ? 'Yes' : 'No'}
-
-===== FULL DESCRIPTION =====
-${character.description || 'Not Mentioned'}
-
-===== CRUCIAL HINT =====
-${character.crucialHint || 'Not Mentioned'}
-
-===== USER QUESTION =====
-${sanitizedQuestion}
-
-===== INSTRUCTIONS =====
-1. Read the ENTIRE data above carefully
-2. If the data has the answer → Reply "Yes" or "No"
-3. If the data does NOT have the answer AT ALL → Reply "IDK"
-4. If the question asks "Is it [name]?" or contains a character name → Reply "IDK"
-5. Reply with ONLY one word: Yes, No, Maybe, or IDK
-6. NEVER reveal the character's name`;
-
-    const systemPrompt = `
-You are a SECURITY-FIRST AI with ZERO tolerance for identity leaks. Your ONLY job is to answer ONE WORD: "Yes", "No", "Maybe", or "IDK".
-
-===== YOUR BRAIN RULES =====
-
-1. READ EVERYTHING - Check ALL fields. Check INSIDE brackets (). Check nested data. Check arrays. Check descriptions. If the answer is hidden ANYWHERE, find it.
-
-2. BRACKETS ARE IMPORTANT - If data says "Human (Jinchuriki)" and user asks "Is he human?" → YES. If data says "Hair: Black (sometimes blonde)" and user asks "Is his hair blonde?" → YES because it's mentioned in brackets.
-
-3. PARTIAL MATCH = YES - If ANY field mentions the topic, even once, even in brackets → YES. You don't need ALL fields to match. ONE match = YES.
-
-4. MULTIPLE VALUES = YES FOR EACH - If data says "Hair: Black and Red" → "Is his hair black?" = YES. "Is his hair red?" = YES. "Is his hair blue?" = IDK (not mentioned).
-
-5. SIBLING/RELATIONSHIP CONNECTION - If data says "Brother of Sasuke" and user asks "Is he related to Sasuke?" → YES. "Is he Sasuke?" → MAYBE (identity protection).
-
-6. CONTEXT UNDERSTANDING - 
-   - "Human (Jinchuriki)" → He is BOTH human AND jinchuriki
-   - "Alive (but dying)" → Is he alive? YES. Is he dead? NO.
-   - "Villain (turned hero)" → Is he villain? YES. Is he hero? YES. 
-   - "Not a main character" → Is he main? NO.
-
-===== SPELLING & SYNONYM RULES =====
-
-1. IGNORE MINOR SPELLING MISTAKES:
-   - "hman" = "human" → YES
-   - "arankar" = "arrancar" → YES
-   - "saiyen" = "saiyan" → YES
-   - "shinobi" = "shinobi" → YES
-   - Any word that is 70% similar = match
-
-2. USE COMMON SYNONYMS:
-   - "boy", "man", "guy", "dude" = "Male" → YES
-   - "girl", "woman", "lady", "gal" = "Female" → YES
-   - "kid", "young", "youth" = "Child" → YES
-   - "old", "elderly", "senior" = "Elder" → YES
-   - "alive", "living", "breathing" = "Alive" → YES
-   - "dead", "deceased", "gone" = "Dead" → YES
-   - "hero", "protagonist", "main" = "Main Character" → YES
-   - "villain", "antagonist", "evil" = "Villain" → YES
-   - "power", "ability", "skill" = "Has Special Power" → YES
-   - "weapon", "sword", "gun" = "Has Weapon" → YES
-   - "family", "brother", "sister" = "Has Family" → YES
-
-===== YOUR RESPONSE RULES =====
-
-YES → When ANY data matches the question
-   - Direct match: "Human" → "Is he human?" = YES
-   - Bracket match: "(Jinchuriki)" → "Is he jinchuriki?" = YES
-   - Partial match: "Black and Red hair" → "Is his hair black?" = YES
-   - Synonym match: "Ninja (Shinobi)" → "Is he a ninja?" = YES
-   - Relationship: "Brother of X" → "Is he related to X?" = YES
-   - Spelling mistake: "arankar" → "arrancar" = YES
-
-NO → ONLY when data EXPLICITLY says the opposite
-   - "Alive" → "Is he dead?" = NO
-   - "Not a villain" → "Is he villain?" = NO
-   - "Human" → "Is he a demon?" = NO (only if data says "not demon")
-
-IDK → ONLY when topic is NOT mentioned ANYWHERE
-   - Not in main text, not in brackets, not in nested fields
-   - If data says "Unknown" → IDK for that topic
-   - If question asks about something never mentioned → IDK
-
-MAYBE → TWO situations ONLY:
-   1. IDENTITY REVEAL QUESTIONS → "Is it Naruto?" = MAYBE
-   2. NAME QUESTIONS → "Is his name Goku?" = MAYBE
-   NEVER say Yes or No to name questions. ALWAYS Maybe.
-
-===== IDENTITY PROTECTION (CRITICAL) =====
-
-- ANY question with a name → ALWAYS "Maybe"
-  Examples: "Is it Naruto?" "Is he Aizen?" "Is his name Goku?" "Is this character Luffy?" → ALL = Maybe
-
-- ANY question trying to confirm identity → ALWAYS "Maybe"
-  Examples: "Is this the main character?" "Is he the protagonist?" "Is he from Naruto?" → These are SAFE (answer normally). Only name-based questions get Maybe.
-
-- PROTECT THE NAME AT ALL COSTS. Even if user says "Is it the guy who..." → read the description, answer the question, but NEVER say "Yes" to "Is it [name]?".
-
-===== DEEP READING EXAMPLES =====
-
-Data: "He is a Human (Jinchuriki) from Konoha. Has blonde hair and blue eyes."
-Question: "Is he human?" → YES (matches Human)
-Question: "Is he a jinchuriki?" → YES (matches bracket)
-Question: "Is he from Konoha?" → YES (matches location)
-Question: "Is his hair blonde?" → YES (matches hair)
-Question: "Is his hair black?" → IDK (not mentioned)
-Question: "Is it Naruto?" → MAYBE (identity protection)
-
-Data: "He is a Shinobi (Ninja) and a member of Akatsuki"
-Question: "Is he a ninja?" → YES (bracket match)
-Question: "Is he in Akatsuki?" → YES (direct match)
-Question: "Is he a samurai?" → IDK (not mentioned)
-Question: "Is he a villain?" → IDK (not mentioned in data)
-
-Data: "Human (Quincy) and Hollow"
-Question: "Is he human?" → YES
-Question: "Is he a Quincy?" → YES
-Question: "Is he Hollow?" → YES
-Question: "Is he a soul reaper?" → IDK (not mentioned)
-Question: "Is he a soul?" → IDK (not mentioned)
-
-Data: "Hair: Black (sometimes red in special form)"
-Question: "Is his hair black?" → YES
-Question: "Is his hair red?" → YES (mentioned in brackets)
-Question: "Is his hair white?" → IDK (not mentioned)
-
-===== FINAL REMINDERS =====
-
-- If ANY part of data mentions the topic → YES
-- If topic appears ANYWHERE (including brackets) → YES
-- If topic has multiple values → YES for each mentioned value
-- If topic has synonyms → YES (villain=antagonist=evil)
-- If data has "Unknown" → IDK for that topic only
-- If question asks name → ALWAYS MAYBE
-- NEVER say the character's name. EVER.
-- ONE WORD ONLY: Yes, No, Maybe, or IDK
-
-YOU WILL BE TESTED. ANY MISTAKE = GAME OVER. THINK. READ EVERYTHING. PROTECT IDENTITY. ANSWER ACCURATELY.`;
-
-    const messages = [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: context }
-    ];
-
-    let answer = "IDK";
-    let usedProvider = 'none';
-
-    try {
-      const result = await askAI(messages);
-      answer = result.answer || 'IDK';
-      usedProvider = result.provider || 'none';
-    } catch (error) {
-      return res.status(503).json({
-        success: false,
-        message: 'AI service temporarily unavailable. Please try again.'
-      });
-    }
-
-    // ✅ FORCE PARSE ANSWER (FIXED: Removed local smart matching override)
-    let finalAnswer = 'IDK';
-    const lowerAnswer = answer.toLowerCase().trim();
-
-    // ✅ CHECK IF IDENTITY REVEAL QUESTION (SECURITY LAYER 1)
-    if (isIdentityRevealQuestion(sanitizedQuestion)) {
-      finalAnswer = 'IDK';
+    if (isIdentityRevealQuestion(sanitizedQuestion, allNames)) {
+      finalAnswer = 'Maybe';
     } else {
-      // ✅ TRUST THE AI (The AI has full context and is smarter than local keyword matching)
-      if (lowerAnswer === 'yes' || lowerAnswer.includes('yes')) {
-        finalAnswer = 'Yes';
-      } 
-      else if (lowerAnswer === 'no' || lowerAnswer.includes('no') || lowerAnswer.includes('not') || lowerAnswer.includes('isn\'t') || lowerAnswer.includes('doesn\'t')) {
-        finalAnswer = 'No';
-      } 
-      else if (lowerAnswer === 'maybe' || lowerAnswer.includes('maybe')) {
-        finalAnswer = 'Maybe';
-      } 
-      else if (lowerAnswer === 'idk' || lowerAnswer.includes('dont know') || lowerAnswer.includes("don't know") || lowerAnswer.includes('not sure') || lowerAnswer.includes('unknown')) {
-        finalAnswer = 'IDK';
-      } 
-      else {
-        finalAnswer = 'IDK';
+      // ---- STEP 2: Can our own data answer this with certainty? ----
+      const deterministic = getDeterministicAnswer(sanitizedQuestion, character);
+
+      if (deterministic) {
+        finalAnswer = deterministic;
+      } else {
+        // ---- STEP 3: Ask the AI to reason it out ----
+        const context = buildCharacterContext(character, sanitizedQuestion);
+        const messages = [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user', content: context }
+        ];
+
+        try {
+          const result = await askAI(messages);
+          finalAnswer = parseAIAnswer(result?.answer);
+          usedProvider = result?.provider || 'ai';
+        } catch (error) {
+          return res.status(503).json({
+            success: false,
+            message: 'AI service temporarily unavailable. Please try again.'
+          });
+        }
       }
     }
 
-    game.questions.push({ 
-      question: sanitizedQuestion, 
-      answer: finalAnswer, 
-      confidence: 1.0 
+    game.questions.push({
+      question: sanitizedQuestion,
+      answer: finalAnswer,
+      confidence: 1.0
     });
     game.totalQuestions += 1;
     await game.save();
@@ -880,7 +813,6 @@ router.post('/guess', [...validateGameId, ...validateGuess], async (req, res) =>
     const { gameId, guess } = req.body;
     const sanitizedGuess = sanitizeInput(guess);
 
-
     const game = await GameSession.findById(gameId).populate('character');
 
     if (!game) {
@@ -939,16 +871,14 @@ router.post('/guess', [...validateGameId, ...validateGuess], async (req, res) =>
       await game.save();
 
       const user = await User.findById(req.user._id);
-      
-      // ===== REGULAR STATS =====
+
       user.stats.gamesPlayed += 1;
       user.stats.gamesWon += 1;
       user.stats.winStreak += 1;
       user.totalGuesses += 1;
 
-      // ===== SEASON STATS =====
       const currentSeason = getCurrentSeason();
-      
+
       if (!user.seasonStats) {
         user.seasonStats = {
           currentSeason: currentSeason,
@@ -957,58 +887,43 @@ router.post('/guess', [...validateGameId, ...validateGuess], async (req, res) =>
           seasonStreak: 0
         };
       }
-      
+
       user.seasonStats.currentSeason = currentSeason;
       user.seasonStats.seasonWins += 1;
       user.seasonStats.seasonPlayed += 1;
       user.seasonStats.seasonStreak += 1;
 
-      // ===== ANIME GUESSES =====
       const anime = game.character.anime;
       const currentAnimeGuesses = user.animeGuesses?.get(anime) || 0;
       user.animeGuesses.set(anime, currentAnimeGuesses + 1);
 
-      // ===== SHARDS =====
       user.shards += 10;
 
-      // ===== CARD COLLECTION =====
       const character = game.character;
       const cardAdded = user.addCard(character);
-      
-      if (cardAdded) {
-      } else {
-      }
 
-      // ============================================================
-      // ✅ SEASON PASS PROGRESS
-      // ============================================================
       if (user.seasonPass && user.seasonPass.active) {
         const activeSeason = await SeasonPass.getActiveSeason();
-        
+
         if (activeSeason) {
-          // Increment correct guesses
           user.seasonPass.correctGuesses = (user.seasonPass.correctGuesses || 0) + 1;
-          
-          // Calculate new tier
+
           const guessesPerTier = activeSeason.correctGuessesPerTier || 2;
           const newTier = Math.floor(user.seasonPass.correctGuesses / guessesPerTier) + 1;
           const finalTier = Math.min(newTier, activeSeason.totalTiers);
-          
+
           const tierAdvanced = finalTier > (user.seasonPass.currentTier || 1);
-          
+
           user.seasonPass.currentTier = finalTier;
-          
-          // Calculate progress percentage
+
           const progressInTier = user.seasonPass.correctGuesses % guessesPerTier;
           user.seasonPass.progress = Math.round((progressInTier / guessesPerTier) * 100);
-          
-          // Check if completed
+
           if (finalTier >= activeSeason.totalTiers && !user.seasonPass.isCompleted) {
             user.seasonPass.isCompleted = true;
             user.seasonPass.completedAt = new Date();
           }
-          
-          // Unlock new tiers
+
           if (tierAdvanced) {
             if (!user.seasonPass.unlockedTiers) user.seasonPass.unlockedTiers = [];
             for (let i = (user.seasonPass.currentTier || 1); i <= finalTier; i++) {
@@ -1021,9 +936,6 @@ router.post('/guess', [...validateGameId, ...validateGuess], async (req, res) =>
         }
       }
 
-      // ============================================================
-      // REFERRAL REWARDS
-      // ============================================================
       const isFirstWin = user.stats.gamesWon === 1;
 
       if (user.referredBy && isFirstWin) {
@@ -1034,7 +946,7 @@ router.post('/guess', [...validateGameId, ...validateGuess], async (req, res) =>
 
         if (referral && !referral.referrerRewards.firstWin) {
           const referrer = await User.findById(referral.referrer);
-          
+
           if (referrer) {
             referrer.shards += 50;
             referrer.referralStats.shardsEarned = (referrer.referralStats?.shardsEarned || 0) + 50;
@@ -1049,14 +961,10 @@ router.post('/guess', [...validateGameId, ...validateGuess], async (req, res) =>
             referral.firstWinAt = new Date();
             referral.completedAt = new Date();
             await referral.save();
-
           }
         }
       }
 
-      // ============================================================
-      // ACHIEVEMENTS
-      // ============================================================
       const unlockedAchievements = await checkAndUnlockAchievements(user._id);
       const photoUnlock = await unlockProfilePhoto(user._id, game.character._id);
 
@@ -1083,7 +991,7 @@ router.post('/guess', [...validateGameId, ...validateGuess], async (req, res) =>
 
     } else {
       const newWrongGuesses = game.guesses.filter(g => !g.isCorrect);
-      
+
       if (newWrongGuesses.length >= 3) {
         game.status = 'lost';
         game.endedAt = new Date();
@@ -1091,19 +999,18 @@ router.post('/guess', [...validateGameId, ...validateGuess], async (req, res) =>
         await game.save();
 
         const currentSeason = getCurrentSeason();
-        
+
         await User.findByIdAndUpdate(req.user._id, {
-          $inc: { 
+          $inc: {
             'stats.gamesPlayed': 1,
             'seasonStats.seasonPlayed': 1
           },
-          $set: { 
+          $set: {
             'stats.winStreak': 0,
             'seasonStats.seasonStreak': 0,
             'seasonStats.currentSeason': currentSeason
           }
         });
-
 
         return res.json({
           success: true,
@@ -1150,7 +1057,6 @@ router.post('/giveup', validateGameId, async (req, res) => {
 
     const { gameId } = req.body;
 
-
     const game = await GameSession.findById(gameId).populate('character');
 
     if (!game) {
@@ -1167,7 +1073,12 @@ router.post('/giveup', validateGameId, async (req, res) => {
       });
     }
 
+    // FIX: this check previously had an empty body and enforced nothing.
     if (game.user.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized'
+      });
     }
 
     game.status = 'abandoned';
@@ -1178,11 +1089,11 @@ router.post('/giveup', validateGameId, async (req, res) => {
     const currentSeason = getCurrentSeason();
 
     await User.findByIdAndUpdate(req.user._id, {
-      $inc: { 
+      $inc: {
         'stats.gamesPlayed': 1,
         'seasonStats.seasonPlayed': 1
       },
-      $set: { 
+      $set: {
         'stats.winStreak': 0,
         'seasonStats.seasonStreak': 0,
         'seasonStats.currentSeason': currentSeason

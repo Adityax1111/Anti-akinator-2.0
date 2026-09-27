@@ -12,6 +12,7 @@ const BlurGame = () => {
   const [gameStarted, setGameStarted] = useState(false);
   const [gameEnded, setGameEnded] = useState(false);
   const [imageUrl, setImageUrl] = useState('');
+  const [secureImageUrl, setSecureImageUrl] = useState(''); // ✅ NEW
   const [characterName, setCharacterName] = useState('');
   const [anime, setAnime] = useState('');
   const [gameId, setGameId] = useState(null);
@@ -99,6 +100,7 @@ const BlurGame = () => {
     setDisplayBlur(100);
     setGameId(null);
     setImageUrl('');
+    setSecureImageUrl(''); // ✅ NEW
     setCharacterName('');
     setAnime('');
     setError('');
@@ -245,6 +247,60 @@ const BlurGame = () => {
   }, [fetchStats]);
 
   // ============================================================
+  // ✅ FETCH SECURE BLURRED IMAGE (NEW)
+  // ============================================================
+  useEffect(() => {
+    if (!gameStarted || !gameId) return;
+
+    let intervalId;
+    let currentObjectUrl = null;
+
+    const fetchBlurredImage = async () => {
+      // Don't fetch if game already ended and we have an image
+      if (gameEnded && secureImageUrl) return;
+
+      try {
+        const token = localStorage.getItem('token');
+        const url = `${import.meta.env.VITE_API_URL}/api/blur-game/image/${gameId}?t=${Date.now()}`;
+        
+        const response = await fetch(url, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch image');
+        }
+
+        const blob = await response.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        
+        // Revoke previous URL to prevent memory leaks
+        if (currentObjectUrl) {
+          URL.revokeObjectURL(currentObjectUrl);
+        }
+        currentObjectUrl = objectUrl;
+        
+        setSecureImageUrl(objectUrl);
+      } catch (err) {
+        console.error("Failed to load image", err);
+      }
+    };
+
+    // Fetch immediately
+    fetchBlurredImage();
+
+    // Fetch every 1 second to update the blur
+    if (!gameEnded) {
+      intervalId = setInterval(fetchBlurredImage, 1000);
+    }
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+      if (currentObjectUrl) URL.revokeObjectURL(currentObjectUrl);
+    };
+  }, [gameStarted, gameId, gameEnded]);
+
+  // ============================================================
   // ✅ START NEW GAME
   // ============================================================
   const startNewGame = async () => {
@@ -273,7 +329,7 @@ const BlurGame = () => {
       if (data.success && data.gameId) {
         
         setGameId(data.gameId);
-        setImageUrl(data.imageUrl);  // ✅ DIRECT URL FROM BACKEND
+        setImageUrl(data.imageUrl);  // Keep this for result display
         setCharacterName(data.characterName || '');
         setAnime(data.anime || '');
         setGameStarted(true);
@@ -307,7 +363,7 @@ const BlurGame = () => {
       if (err.response?.data?.gameId && err.response?.data?.imageUrl) {
         const data = err.response.data;
         setGameId(data.gameId);
-        setImageUrl(data.imageUrl);  // ✅ DIRECT URL FROM BACKEND
+        setImageUrl(data.imageUrl);
         setCharacterName(data.characterName || '');
         setAnime(data.anime || '');
         setGameStarted(true);
@@ -478,8 +534,11 @@ const BlurGame = () => {
       if (timerRef.current) {
         clearInterval(timerRef.current);
       }
+      if (secureImageUrl) {
+        URL.revokeObjectURL(secureImageUrl);
+      }
     };
-  }, []);
+  }, [secureImageUrl]);
 
   // ============================================================
   // ✅ RENDER
@@ -606,12 +665,11 @@ const BlurGame = () => {
 
           <div className="image-container">
             <img 
-              src={imageUrl} 
+              src={secureImageUrl || 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="400"%3E%3Crect width="400" height="400" fill="%231a1a2e"/%3E%3Ctext x="50" y="200" font-family="Arial" font-size="24" fill="%2394a3b8"%3ELoading...%3C/text%3E%3C/svg%3E'}
               alt="Mystery Character"
               className="mystery-image"
               style={{ 
-                filter: `blur(${(displayBlur / 100) * 50}px)`,
-                transition: 'filter 0.3s ease',
+                transition: 'filter 0.3s ease, opacity 0.3s ease',
                 width: '100%',
                 height: '100%',
                 objectFit: 'cover'

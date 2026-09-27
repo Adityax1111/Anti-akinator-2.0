@@ -2,6 +2,7 @@
 const Character = require('../models/Character');
 const User = require('../models/User');
 const BlurGameSession = require('../models/BlurGameSession');
+const sharp = require('sharp'); // ✅ Added for image blurring
 
 // ============================================================
 // HELPER: Normalize string for matching
@@ -39,7 +40,7 @@ function isMatchingGuess(guess, characterName) {
 }
 
 // ============================================================
-// ✅ EXPORT: getBlurImage - IMAGE PROXY
+// ✅ EXPORT: getBlurImage - SECURE BLURRED IMAGE PROXY
 // ============================================================
 exports.getBlurImage = async (req, res) => {
   try {
@@ -55,18 +56,9 @@ exports.getBlurImage = async (req, res) => {
       });
     }
 
+    // If game is completed, send the original clear image
     if (game.isCompleted) {
-      return res.status(403).json({
-        success: false,
-        message: 'Game already completed'
-      });
-    }
-
-    if (game.userId.toString() !== req.user._id.toString()) {
-      return res.status(403).json({
-        success: false,
-        message: 'You do not have permission to view this image'
-      });
+      return res.redirect(game.imageUrl);
     }
 
     const imageUrl = game.imageUrl;
@@ -78,17 +70,45 @@ exports.getBlurImage = async (req, res) => {
       });
     }
 
+    // Calculate time elapsed in seconds
+    const secondsElapsed = Math.floor((Date.now() - new Date(game.createdAt).getTime()) / 1000);
+    
+    // Calculate blur amount (30px blur at 0s, 0px blur at 60s)
+    const maxBlur = 30;
+    let blurAmount = Math.max(0, maxBlur - (secondsElapsed / 60) * maxBlur);
+    blurAmount = Math.round(blurAmount);
+
+    // If no blur needed, redirect to original
+    if (blurAmount === 0) {
+      return res.redirect(imageUrl);
+    }
+
     try {
+      // Download the original image
       const response = await fetch(imageUrl);
-      const contentType = response.headers.get('content-type') || 'image/jpeg';
       
-      res.setHeader('Content-Type', contentType);
-      
-      const buffer = await response.arrayBuffer();
-      res.send(Buffer.from(buffer));
+      if (!response.ok) {
+        throw new Error('Failed to fetch image');
+      }
+
+      const arrayBuffer = await response.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+
+      // Blur the image using sharp on the fly
+      const blurredBuffer = await sharp(buffer)
+        .blur(blurAmount)
+        .jpeg({ quality: 80 }) // Convert to jpeg for smaller size
+        .toBuffer();
+
+      // Send the blurred image
+      res.setHeader('Content-Type', 'image/jpeg');
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+      return res.send(blurredBuffer);
       
     } catch (fetchError) {
+      console.error('Error processing image:', fetchError);
       
+      // Fallback: send an SVG placeholder if image fails
       res.setHeader('Content-Type', 'image/svg+xml');
       res.send(`<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">
         <rect width="400" height="400" fill="#1a1a2e"/>
@@ -98,6 +118,7 @@ exports.getBlurImage = async (req, res) => {
     }
 
   } catch (error) {
+    console.error('getBlurImage error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to load image'
@@ -111,7 +132,6 @@ exports.getBlurImage = async (req, res) => {
 exports.startGame = async (req, res) => {
   try {
     const userId = req.user._id;
-
 
     const existingGame = await BlurGameSession.findOne({
       userId: userId,
@@ -172,7 +192,6 @@ exports.startGame = async (req, res) => {
 
     await game.save();
 
-
     res.status(200).json({
       success: true,
       gameId: game._id,
@@ -203,7 +222,6 @@ exports.submitGuess = async (req, res) => {
   try {
     const userId = req.user._id;
     const { gameId, guess, timeTaken } = req.body;
-
 
     if (!gameId || !guess) {
       return res.status(400).json({
@@ -427,7 +445,6 @@ exports.abandonGame = async (req, res) => {
   try {
     const userId = req.user._id;
     const { gameId } = req.body;
-
 
     if (!gameId) {
       return res.status(400).json({

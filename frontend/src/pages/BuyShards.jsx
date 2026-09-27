@@ -7,12 +7,12 @@ import PaymentQRModal from '../components/PaymentQRModal';
 import './BuyShards.css';
 
 const shardPackages = [
-  { id: 1, name: 'STARTER', shards: 50, price: '₹36 INR', priceValue: 36, hints: 1, tag: null },
-  { id: 2, name: 'ENTHUSIAST', shards: 150, price: '₹105 INR', priceValue: 105, hints: 3, tag: null },
-  { id: 3, name: 'PRO', shards: 350, price: '₹210 INR', priceValue: 210, hints: 7, tag: null },
-  { id: 4, name: 'POPULAR', shards: 750, price: '₹375 INR', priceValue: 375, hints: 15, tag: '⭐ Popular' },
-  { id: 5, name: 'ULTIMATE', shards: 1500, price: '₹750 INR', priceValue: 750, hints: 30, tag: null },
-  { id: 6, name: 'LEGENDARY', shards: 3000, price: '₹1350 INR', priceValue: 1350, hints: 60, tag: null },
+  { id: 1, name: 'STARTER', shards: 50, price: '₹5 INR', priceValue: 5, hints: 0, tag: null },
+  { id: 2, name: 'ENTHUSIAST', shards: 100, price: '₹15 INR', priceValue: 15, hints: 1, tag: null },
+  { id: 3, name: 'PRO', shards: 300, price: '₹30 INR', priceValue: 30, hints: 3, tag: null },
+  { id: 4, name: 'POPULAR', shards: 700, price: '₹35 INR', priceValue: 35, hints: 7, tag: '⭐ Popular' },
+  { id: 5, name: 'ULTIMATE', shards: 1000, price: '₹50 INR', priceValue: 50, hints: 10, tag: null },
+  { id: 6, name: 'LEGENDARY', shards: 2000, price: '₹90 INR', priceValue: 90, hints: 20, tag: null },
 ];
 
 const BuyShards = () => {

@@ -10,8 +10,9 @@ const {
   getDailyChallenge,
   getGameStats,
   abandonGame,
+  timeoutGame,   // ✅ NEW — closes the session the instant the client timer hits 0
   getTestCharacter,
-  getBlurImage  // ✅ Make sure this is imported
+  getBlurImage
 } = require('../controllers/blurGameController');
 
 // ============================================================
@@ -28,15 +29,22 @@ const validateGuess = [
     .withMessage('Guess contains invalid characters')
 ];
 
+const validateGameId = [
+  body('gameId')
+    .trim()
+    .isLength({ min: 1 })
+    .withMessage('Game ID is required')
+];
+
 // ============================================================
 // ROUTES
 // ============================================================
 
 router.post('/start', authMiddleware, startGame);
 router.post('/guess', authMiddleware, validateGuess, submitGuess);
-router.post('/abandon', authMiddleware, abandonGame);
+router.post('/abandon', authMiddleware, validateGameId, abandonGame);
+router.post('/timeout', authMiddleware, validateGameId, timeoutGame); // ✅ NEW
 
-// ✅ This route was causing the error - make sure getBlurImage is defined
 router.get('/image/:gameId', authMiddleware, getBlurImage);
 
 router.get('/history', authMiddleware, getGameHistory);

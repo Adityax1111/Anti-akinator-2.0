@@ -2,20 +2,26 @@
 import api from './axios';
 
 // ============================================================
+// SHARED CONSTANTS — must mirror the backend controller
+// (GAME_DURATION / CARD_WINDOW in blurGameController.js).
+// These were missing before, which is why the timer/blur math
+// silently turned into NaN and the game looked "frozen".
+// ============================================================
+export const GAME_DURATION_SECONDS = 60;
+export const CARD_WINDOW_SECONDS = 30;
+
+// ============================================================
 // BLUR GAME API SERVICE
 // ============================================================
 
 /**
  * Start a new blur game session
- * @returns {Promise} Game session data with image URL
+ * @returns {Promise} Game session data (no imageUrl/characterName — those
+ * are never sent to the client while a game is active)
  */
 export const startGame = async () => {
-  try {
-    const response = await api.post('/blur-game/start');
-    return response.data;
-  } catch (error) {
-    throw error;
-  }
+  const response = await api.post('/blur-game/start');
+  return response.data;
 };
 
 /**
@@ -26,16 +32,54 @@ export const startGame = async () => {
  * @returns {Promise} Result of the guess
  */
 export const submitGuess = async (gameId, guess, timeTaken) => {
-  try {
-    const response = await api.post('/blur-game/guess', {
-      gameId,
-      guess,
-      timeTaken
-    });
-    return response.data;
-  } catch (error) {
-    throw error;
-  }
+  const response = await api.post('/blur-game/guess', {
+    gameId,
+    guess,
+    timeTaken
+  });
+  return response.data;
+};
+
+/**
+ * Tell the server the player left/closed the game early.
+ * Server marks the session as a loss and returns the real answer,
+ * since the round is over either way.
+ * @param {string} gameId
+ * @returns {Promise}
+ */
+export const abandonGame = async (gameId) => {
+  const response = await api.post('/blur-game/abandon', { gameId });
+  return response.data;
+};
+
+/**
+ * Tell the server the client-side 60s timer ran out.
+ * Keeps the backend session in sync with what the player sees,
+ * so a reload can never resume a session that should already be over.
+ * @param {string} gameId
+ * @returns {Promise}
+ */
+export const timeoutGame = async (gameId) => {
+  const response = await api.post('/blur-game/timeout', { gameId });
+  return response.data;
+};
+
+/**
+ * Fetch the current blurred frame for an active game as a Blob.
+ * This hits the authenticated secure proxy (/blur-game/image/:gameId),
+ * which returns blurred JPEG bytes (or a placeholder SVG) while the
+ * round is live, and only redirects to the real image once the game
+ * is completed server-side. Nothing about the source URL is ever
+ * exposed in the response — the Network tab only ever sees opaque
+ * image bytes for an active round.
+ * @param {string} gameId
+ * @returns {Promise<Blob>}
+ */
+export const fetchBlurImageBlob = async (gameId) => {
+  const response = await api.get(`/blur-game/image/${gameId}`, {
+    responseType: 'blob'
+  });
+  return response.data;
 };
 
 /**
@@ -45,14 +89,10 @@ export const submitGuess = async (gameId, guess, timeTaken) => {
  * @returns {Promise} Game history data
  */
 export const getGameHistory = async (limit = 20, page = 1) => {
-  try {
-    const response = await api.get('/blur-game/history', {
-      params: { limit, page }
-    });
-    return response.data;
-  } catch (error) {
-    throw error;
-  }
+  const response = await api.get('/blur-game/history', {
+    params: { limit, page }
+  });
+  return response.data;
 };
 
 /**
@@ -60,12 +100,8 @@ export const getGameHistory = async (limit = 20, page = 1) => {
  * @returns {Promise} Daily challenge data
  */
 export const getDailyChallenge = async () => {
-  try {
-    const response = await api.get('/blur-game/daily');
-    return response.data;
-  } catch (error) {
-    throw error;
-  }
+  const response = await api.get('/blur-game/daily');
+  return response.data;
 };
 
 /**
@@ -73,68 +109,24 @@ export const getDailyChallenge = async () => {
  * @returns {Promise} Game stats
  */
 export const getGameStats = async () => {
-  try {
-    const response = await api.get('/blur-game/stats');
-    return response.data;
-  } catch (error) {
-    throw error;
-  }
-};
-
-// ============================================================
-// LOCAL STORAGE HELPERS
-// ============================================================
-
-/**
- * Save game state to localStorage (for resume later)
- * @param {Object} gameState - Game state object
- */
-export const saveGameState = (gameState) => {
-  try {
-    localStorage.setItem('blurGameState', JSON.stringify(gameState));
-  } catch (error) {
-  }
-};
-
-/**
- * Get saved game state from localStorage
- * @returns {Object|null} Saved game state or null
- */
-export const getSavedGameState = () => {
-  try {
-    const state = localStorage.getItem('blurGameState');
-    return state ? JSON.parse(state) : null;
-  } catch (error) {
-    return null;
-  }
-};
-
-/**
- * Clear saved game state from localStorage
- */
-export const clearSavedGameState = () => {
-  try {
-    localStorage.removeItem('blurGameState');
-  } catch (error) {
-  }
+  const response = await api.get('/blur-game/stats');
+  return response.data;
 };
 
 // ============================================================
 // UTILITY FUNCTIONS
+// (Purely cosmetic/local helpers — the server is always the source
+// of truth for correctness/timing/rewards. Nothing here is used to
+// decide whether a guess is right.)
 // ============================================================
 
 /**
- * Calculate blur percentage based on time elapsed
- * @param {number} elapsedSeconds - Time elapsed in seconds
- * @param {number} totalSeconds - Total blur duration in seconds
- * @param {number} maxBlur - Maximum blur amount
- * @param {number} minBlur - Minimum blur amount
- * @returns {number} Blur amount
+ * Calculate blur percentage based on time elapsed (local display only)
  */
 export const calculateBlur = (
   elapsedSeconds,
-  totalSeconds = 90,
-  maxBlur = 99,
+  totalSeconds = GAME_DURATION_SECONDS,
+  maxBlur = 100,
   minBlur = 0
 ) => {
   const progress = Math.min(elapsedSeconds / totalSeconds, 1);
@@ -143,58 +135,15 @@ export const calculateBlur = (
 };
 
 /**
- * Check if a guess is correct (with tolerance)
- * @param {string} guess - User's guess
- * @param {string} characterName - Actual character name
- * @returns {boolean} Whether the guess is correct
+ * Check if user can win a card based on time (local display only —
+ * the server re-checks this authoritatively in submitGuess)
  */
-export const checkGuess = (guess, characterName) => {
-  if (!guess || !characterName) return false;
-
-  const normalize = (str) => {
-    if (!str) return '';
-    return str.toLowerCase()
-      .replace(/[^a-zA-Z0-9\s]/g, '')
-      .replace(/\s+/g, ' ')
-      .trim();
-  };
-
-  const normalizedGuess = normalize(guess);
-  const normalizedName = normalize(characterName);
-
-  // Exact match
-  if (normalizedGuess === normalizedName) return true;
-
-  // Check if guess is a substring of the name
-  if (normalizedName.includes(normalizedGuess) && normalizedGuess.length >= 3) {
-    return true;
-  }
-
-  // Check if all words in guess are in the name
-  const guessWords = normalizedGuess.split(' ');
-  const nameWords = normalizedName.split(' ');
-  const allWordsMatch = guessWords.every(word => nameWords.includes(word));
-  if (allWordsMatch && guessWords.length > 0) {
-    return true;
-  }
-
-  return false;
-};
-
-/**
- * Check if user can win a card based on time
- * @param {number} timeTaken - Time taken in seconds
- * @param {number} timeLimit - Time limit in seconds (default: 30)
- * @returns {boolean} Whether the user wins a card
- */
-export const canWinCard = (timeTaken, timeLimit = 30) => {
+export const canWinCard = (timeTaken, timeLimit = CARD_WINDOW_SECONDS) => {
   return timeTaken <= timeLimit;
 };
 
 /**
- * Get reward emoji based on time taken
- * @param {number} timeTaken - Time taken in seconds
- * @returns {string} Reward emoji
+ * Get reward emoji based on time taken (cosmetic only)
  */
 export const getRewardEmoji = (timeTaken) => {
   if (timeTaken <= 10) return '🏆';
@@ -204,14 +153,11 @@ export const getRewardEmoji = (timeTaken) => {
 };
 
 /**
- * Get reward message based on time taken
- * @param {number} timeTaken - Time taken in seconds
- * @param {boolean} isCorrect - Whether the guess was correct
- * @returns {string} Reward message
+ * Get reward message based on time taken (cosmetic only — server sends
+ * its own authoritative rewardMessage in every response)
  */
 export const getRewardMessage = (timeTaken, isCorrect) => {
   if (!isCorrect) return 'Better luck next time!';
-  
   if (timeTaken <= 10) return '🏆 Amazing! Lightning fast guess!';
   if (timeTaken <= 20) return '🥈 Great job! Very quick!';
   if (timeTaken <= 30) return '🥉 Nice! You won the card!';
@@ -222,20 +168,11 @@ export const getRewardMessage = (timeTaken, isCorrect) => {
 // DAILY CHALLENGE HELPERS
 // ============================================================
 
-/**
- * Check if today's daily challenge is still available
- * @param {string} lastPlayedDate - Last played date in YYYY-MM-DD format
- * @returns {boolean} Whether daily challenge is available
- */
 export const isDailyChallengeAvailable = (lastPlayedDate) => {
   const today = new Date().toISOString().split('T')[0];
   return lastPlayedDate !== today;
 };
 
-/**
- * Get today's date string (YYYY-MM-DD)
- * @returns {string} Today's date
- */
 export const getTodayString = () => {
   return new Date().toISOString().split('T')[0];
 };
@@ -244,30 +181,15 @@ export const getTodayString = () => {
 // STATS HELPERS
 // ============================================================
 
-/**
- * Calculate win rate percentage
- * @param {number} gamesPlayed - Total games played
- * @param {number} gamesWon - Total games won
- * @returns {number} Win rate percentage
- */
 export const calculateWinRate = (gamesPlayed, gamesWon) => {
   if (gamesPlayed === 0) return 0;
   return Math.round((gamesWon / gamesPlayed) * 100);
 };
 
-/**
- * Format time for display
- * @param {number} seconds - Time in seconds
- * @returns {string} Formatted time string
- */
 export const formatTimeDisplay = (seconds) => {
   if (!seconds) return '--';
-  
   const mins = Math.floor(seconds / 60);
   const secs = seconds % 60;
-  
-  if (mins > 0) {
-    return `${mins}m ${secs}s`;
-  }
+  if (mins > 0) return `${mins}m ${secs}s`;
   return `${secs}s`;
 };

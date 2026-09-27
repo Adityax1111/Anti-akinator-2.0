@@ -2,19 +2,33 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { startGame, submitGuess, getGameStats } from '../api/blurGame';
+import {
+  startGame,
+  submitGuess,
+  getGameStats,
+  abandonGame as abandonGameApi,
+  timeoutGame as timeoutGameApi,
+  fetchBlurImageBlob,
+  GAME_DURATION_SECONDS,
+  CARD_WINDOW_SECONDS
+} from '../api/blurGame';
 import './BlurGame.css';
+
+const PLACEHOLDER_LOADING =
+  'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="400"%3E%3Crect width="400" height="400" fill="%231a1a2e"/%3E%3Ctext x="50" y="200" font-family="Arial" font-size="24" fill="%2394a3b8"%3ELoading...%3C/text%3E%3C/svg%3E';
+
+const PLACEHOLDER_ERROR =
+  'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400"%3E%3Crect width="400" height="400" fill="%231a1a2e"/%3E%3Ctext x="200" y="190" font-family="Arial" font-size="20" fill="%2394a3b8" text-anchor="middle"%3E%F0%9F%94%AE Connecting...%3C/text%3E%3Ctext x="200" y="220" font-family="Arial" font-size="13" fill="%2364748b" text-anchor="middle"%3EKeep guessing meanwhile%3C/text%3E%3C/svg%3E';
 
 const BlurGame = () => {
   const { user, updateUser } = useAuth();
   const navigate = useNavigate();
+
   const [loading, setLoading] = useState(false);
   const [gameStarted, setGameStarted] = useState(false);
   const [gameEnded, setGameEnded] = useState(false);
-  const [imageUrl, setImageUrl] = useState('');
-  const [secureImageUrl, setSecureImageUrl] = useState(''); // ✅ NEW
-  const [characterName, setCharacterName] = useState('');
-  const [anime, setAnime] = useState('');
+  const [secureImageUrl, setSecureImageUrl] = useState('');
+  const [imageStalled, setImageStalled] = useState(false);
   const [gameId, setGameId] = useState(null);
   const [guess, setGuess] = useState('');
   const [timeElapsed, setTimeElapsed] = useState(0);
@@ -30,67 +44,15 @@ const BlurGame = () => {
   const [remainingGuesses, setRemainingGuesses] = useState(3);
   const [guessedNames, setGuessedNames] = useState([]);
 
-  const timerRef = useRef(null);
-  const startTimeRef = useRef(null);
   const guessInputRef = useRef(null);
   const gameAbandonedRef = useRef(false);
   const isGameEndingRef = useRef(false);
   const isGameStartingRef = useRef(false);
+  const endGameRef = useRef(() => {});
 
-  // ============================================================
-  // ✅ BLUR CALCULATION
-  // ============================================================
-  const getBlurValues = (seconds) => {
-    const totalTime = 60;
-    const display = Math.max(0, 100 - (seconds / totalTime) * 100);
-    const displayRounded = Math.round(display);
-    return {
-      display: displayRounded,
-      actual: Math.round((displayRounded / 100) * 50)
-    };
-  };
-
-  // ============================================================
-  // ✅ START THE TIMER
-  // ============================================================
-  const startTimer = useCallback(() => {
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-
-    startTimeRef.current = Date.now();
-    isGameStartingRef.current = false;
-    
-
-    timerRef.current = setInterval(() => {
-      const now = Date.now();
-      const elapsed = Math.floor((now - startTimeRef.current) / 1000);
-      
-      setTimeElapsed(elapsed);
-      
-      const { display } = getBlurValues(elapsed);
-      setDisplayBlur(display);
-      
-      if (elapsed >= 60) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-        endGame(null, true);
-      }
-    }, 100);
-  }, []);
-
-  // ============================================================
-  // ✅ CLEANUP GAME
-  // ============================================================
   const cleanupGame = useCallback(() => {
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
     gameAbandonedRef.current = false;
     isGameEndingRef.current = false;
-    isGameStartingRef.current = false;
     setGameEnded(false);
     setGameStarted(false);
     setCanGuess(true);
@@ -99,81 +61,60 @@ const BlurGame = () => {
     setTimeElapsed(0);
     setDisplayBlur(100);
     setGameId(null);
-    setImageUrl('');
-    setSecureImageUrl(''); // ✅ NEW
-    setCharacterName('');
-    setAnime('');
+    setSecureImageUrl('');
+    setImageStalled(false);
     setError('');
     setSuccess('');
     setWrongGuesses(0);
     setMaxGuesses(3);
     setRemainingGuesses(3);
     setGuessedNames([]);
-    startTimeRef.current = null;
   }, []);
 
-  // ============================================================
-  // ✅ ABANDON GAME
-  // ============================================================
   const abandonGame = useCallback(async () => {
-    if (isGameStartingRef.current) {
-      return;
-    }
-    
-    if (gameAbandonedRef.current || isGameEndingRef.current) {
-      return;
-    }
-    
-    if (!gameStarted || gameEnded) {
-      return;
-    }
+    if (isGameStartingRef.current) return;
+    if (gameAbandonedRef.current || isGameEndingRef.current) return;
+    if (!gameStarted || gameEnded) return;
+
     isGameEndingRef.current = true;
     gameAbandonedRef.current = true;
-    
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-    
+
     setGameEnded(true);
     setCanGuess(false);
-    
+
     setResult({
       isCorrect: false,
       wonCard: false,
-      characterName: characterName || 'Unknown',
-      anime: anime || 'Unknown',
-      imageUrl: imageUrl || '',
+      characterName: 'Revealing…',
+      anime: '',
       timeTaken: timeElapsed,
       message: '🚪 You left the game!',
       rewardMessage: 'Game counted as a loss. Stay on the page to play!'
     });
-    
+
     if (gameId) {
       try {
-        const token = localStorage.getItem('token');
-        await fetch(`${import.meta.env.VITE_API_URL}/api/blur-game/abandon`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({ gameId })
-        });
+        const data = await abandonGameApi(gameId);
+        if (data.success) {
+          setResult(prev => ({
+            ...prev,
+            characterName: data.characterName || 'Unknown',
+            anime: data.anime || 'Unknown'
+          }));
+        }
       } catch (err) {
+        // best-effort — nothing more we can do here
       }
     }
-    
+
     await fetchStats();
     isGameEndingRef.current = false;
-  }, [gameStarted, gameEnded, gameId, characterName, anime, imageUrl, timeElapsed]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gameStarted, gameEnded, gameId, timeElapsed]);
 
-  // ============================================================
-  // ✅ PAGE VISIBILITY (Tab switch)
-  // ============================================================
   useEffect(() => {
     let timeoutId = null;
-    
+
     const handleVisibilityChange = () => {
       if (document.hidden && gameStarted && !gameEnded && !gameAbandonedRef.current) {
         timeoutId = setTimeout(() => {
@@ -183,7 +124,7 @@ const BlurGame = () => {
         }, 500);
       }
     };
-    
+
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
@@ -191,9 +132,6 @@ const BlurGame = () => {
     };
   }, [gameStarted, gameEnded, abandonGame]);
 
-  // ============================================================
-  // ✅ BEFORE UNLOAD
-  // ============================================================
   useEffect(() => {
     const handleBeforeUnload = (e) => {
       if (gameStarted && !gameEnded && !gameAbandonedRef.current) {
@@ -202,43 +140,38 @@ const BlurGame = () => {
         return e.returnValue;
       }
     };
-    
+
     const handleUnload = () => {
-      if (gameStarted && !gameEnded && !gameAbandonedRef.current) {
-        abandonGame();
+      if (gameStarted && !gameEnded && !gameAbandonedRef.current && gameId) {
+        try {
+          fetch(`${import.meta.env.VITE_API_URL}/api/blur-game/abandon`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            },
+            body: JSON.stringify({ gameId }),
+            keepalive: true
+          }).catch(() => {});
+        } catch (e) { /* ignore */ }
       }
     };
-    
+
     window.addEventListener('beforeunload', handleBeforeUnload);
     window.addEventListener('unload', handleUnload);
-    
+
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
       window.removeEventListener('unload', handleUnload);
     };
-  }, [gameStarted, gameEnded, abandonGame]);
+  }, [gameStarted, gameEnded, gameId]);
 
-  // ============================================================
-  // ✅ COMPONENT UNMOUNT
-  // ============================================================
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
-    };
-  }, []);
-
-  // ============================================================
-  // ✅ FETCH STATS
-  // ============================================================
   const fetchStats = useCallback(async () => {
     try {
       const data = await getGameStats();
-      if (data.success) {
-        setStats(data.data);
-      }
+      if (data.success) setStats(data.data);
     } catch (err) {
+      // non-fatal
     }
   }, []);
 
@@ -246,230 +179,80 @@ const BlurGame = () => {
     fetchStats();
   }, [fetchStats]);
 
-  // ============================================================
-  // ✅ FETCH SECURE BLURRED IMAGE (NEW)
-  // ============================================================
-  useEffect(() => {
-    if (!gameStarted || !gameId) return;
-
-    let intervalId;
-    let currentObjectUrl = null;
-
-    const fetchBlurredImage = async () => {
-      // Don't fetch if game already ended and we have an image
-      if (gameEnded && secureImageUrl) return;
-
-      try {
-        const token = localStorage.getItem('token');
-        const url = `${import.meta.env.VITE_API_URL}/api/blur-game/image/${gameId}?t=${Date.now()}`;
-        
-        const response = await fetch(url, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch image');
-        }
-
-        const blob = await response.blob();
-        const objectUrl = URL.createObjectURL(blob);
-        
-        // Revoke previous URL to prevent memory leaks
-        if (currentObjectUrl) {
-          URL.revokeObjectURL(currentObjectUrl);
-        }
-        currentObjectUrl = objectUrl;
-        
-        setSecureImageUrl(objectUrl);
-      } catch (err) {
-        console.error("Failed to load image", err);
-      }
-    };
-
-    // Fetch immediately
-    fetchBlurredImage();
-
-    // Fetch every 1 second to update the blur
-    if (!gameEnded) {
-      intervalId = setInterval(fetchBlurredImage, 1000);
-    }
-
-    return () => {
-      if (intervalId) clearInterval(intervalId);
-      if (currentObjectUrl) URL.revokeObjectURL(currentObjectUrl);
-    };
-  }, [gameStarted, gameId, gameEnded]);
-
-  // ============================================================
-  // ✅ START NEW GAME
-  // ============================================================
-  const startNewGame = async () => {
-    
-    isGameStartingRef.current = true;
-    
-    cleanupGame();
-    
-    setLoading(true);
-    setError('');
-    setSuccess('');
-    setResult(null);
-    setGameEnded(false);
-    setCanGuess(true);
-    setGuess('');
-    setWrongGuesses(0);
-    setMaxGuesses(3);
-    setRemainingGuesses(3);
-    setGuessedNames([]);
-    gameAbandonedRef.current = false;
-    isGameEndingRef.current = false;
-    
-    try {
-      const data = await startGame();
-      
-      if (data.success && data.gameId) {
-        
-        setGameId(data.gameId);
-        setImageUrl(data.imageUrl);  // Keep this for result display
-        setCharacterName(data.characterName || '');
-        setAnime(data.anime || '');
-        setGameStarted(true);
-        setTimeElapsed(0);
-        setDisplayBlur(100);
-        setMaxGuesses(data.maxGuesses || 3);
-        setRemainingGuesses(data.maxGuesses || 3);
-        
-        setLoading(false);
-        setSuccess(`🎯 Game started! You have ${data.maxGuesses || 3} guesses. Guess within 30 seconds to win the card!`);
-        setTimeout(() => setSuccess(''), 4000);
-        
-        setTimeout(() => {
-          isGameStartingRef.current = false;
-          startTimer();
-        }, 300);
-        
-        setTimeout(() => {
-          if (guessInputRef.current) {
-            guessInputRef.current.focus();
-          }
-        }, 400);
-        
-      } else {
-        setError(data.message || 'Failed to start game. Please try again.');
-        setLoading(false);
-        isGameStartingRef.current = false;
-      }
-    } catch (err) {
-      
-      if (err.response?.data?.gameId && err.response?.data?.imageUrl) {
-        const data = err.response.data;
-        setGameId(data.gameId);
-        setImageUrl(data.imageUrl);
-        setCharacterName(data.characterName || '');
-        setAnime(data.anime || '');
-        setGameStarted(true);
-        setTimeElapsed(0);
-        setDisplayBlur(100);
-        setMaxGuesses(data.maxGuesses || 3);
-        setRemainingGuesses(data.maxGuesses || 3);
-        
-        setLoading(false);
-        setSuccess('🔄 Resuming existing game...');
-        setTimeout(() => setSuccess(''), 3000);
-        
-        setTimeout(() => {
-          isGameStartingRef.current = false;
-          startTimer();
-        }, 300);
-      } else {
-        setError(err.response?.data?.message || 'Failed to start game. Please try again.');
-        setLoading(false);
-        isGameStartingRef.current = false;
-      }
-    }
-  };
-
-  // ============================================================
-  // ✅ END GAME
-  // ============================================================
   const endGame = async (guessText = null, timedOut = false) => {
     if (isGameEndingRef.current || gameAbandonedRef.current) return;
     if (gameEnded) return;
-    
+
     if (timedOut) {
       isGameEndingRef.current = true;
-      
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
-      
+
       setGameEnded(true);
       setCanGuess(false);
-      
+
       setResult({
         isCorrect: false,
         wonCard: false,
-        characterName: characterName || 'Unknown',
-        anime: anime || 'Unknown',
-        imageUrl: imageUrl || '',
+        characterName: 'Revealing…',
+        anime: '',
         timeTaken: timeElapsed,
-        message: '⏰ Time\'s up!',
+        message: "⏰ Time's up!",
         rewardMessage: 'The image is fully clear now! Better luck next time!'
       });
-      
-      if (stats) {
-        setStats({
-          ...stats,
-          gamesPlayed: (stats.gamesPlayed || 0) + 1
-        });
+
+      if (gameId) {
+        try {
+          const data = await timeoutGameApi(gameId);
+          if (data.success) {
+            setResult(prev => ({
+              ...prev,
+              characterName: data.characterName || 'Unknown',
+              anime: data.anime || 'Unknown',
+              wrongGuesses: data.wrongGuesses,
+              maxGuesses: data.maxGuesses,
+              guessedNames: data.guessedNames
+            }));
+          }
+        } catch (err) {
+          // non-fatal — player still sees a result, just without the reveal
+        }
       }
-      
+
+      setStats(prev => prev ? { ...prev, gamesPlayed: (prev.gamesPlayed || 0) + 1 } : prev);
+
       isGameEndingRef.current = false;
       return;
     }
-    
+
     if (guessText) {
       setIsSubmitting(true);
       try {
         const data = await submitGuess(gameId, guessText, timeElapsed);
-        
-        // ✅ WRONG GUESS - CAN RETRY
+
         if (data.success === false && data.canRetry) {
-          
           setWrongGuesses(data.wrongGuesses || 0);
           setRemainingGuesses(data.remainingGuesses || 0);
           setGuessedNames(prev => [...prev, guessText]);
-          
+
           setError(data.message || 'Wrong guess! Try again.');
           setGuess('');
           setIsSubmitting(false);
           isGameEndingRef.current = false;
-          
+
           setTimeout(() => {
-            if (guessInputRef.current) {
-              guessInputRef.current.focus();
-            }
+            if (guessInputRef.current) guessInputRef.current.focus();
           }, 100);
           return;
         }
-        
-        // ✅ GAME OVER OR CORRECT
+
         if (data.success || data.gameOver) {
-          
-          if (timerRef.current) {
-            clearInterval(timerRef.current);
-            timerRef.current = null;
-          }
-          
           setGameEnded(true);
           setCanGuess(false);
-          
+
           setResult({
             isCorrect: data.isCorrect || false,
             wonCard: data.winsCard || false,
-            characterName: data.characterName || characterName || 'Unknown',
-            anime: data.anime || anime || 'Unknown',
-            imageUrl: data.imageUrl || imageUrl || '',
+            characterName: data.characterName || 'Unknown',
+            anime: data.anime || 'Unknown',
             timeTaken: data.timeTaken || timeElapsed,
             message: data.message || 'Game Over!',
             rewardMessage: data.rewardMessage || '',
@@ -477,16 +260,12 @@ const BlurGame = () => {
             maxGuesses: data.maxGuesses || 3,
             guessedNames: data.guessedNames || []
           });
-          
+
           if (data.stats) {
             setStats(data.stats);
-            if (updateUser) {
-              updateUser({
-                blurGameStats: data.stats
-              });
-            }
+            if (updateUser) updateUser({ blurGameStats: data.stats });
           }
-          
+
           if (data.winsCard) {
             setSuccess('🎉 You won the character card!');
             setTimeout(() => setSuccess(''), 4000);
@@ -501,9 +280,127 @@ const BlurGame = () => {
     }
   };
 
-  // ============================================================
-  // ✅ HANDLE GUESS SUBMIT
-  // ============================================================
+  useEffect(() => {
+    endGameRef.current = endGame;
+  });
+
+  useEffect(() => {
+    if (!gameStarted || !gameId || gameEnded) return;
+
+    const startedAt = Date.now();
+    setTimeElapsed(0);
+    setDisplayBlur(100);
+
+    const intervalId = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - startedAt) / 1000);
+      setTimeElapsed(elapsed);
+      setDisplayBlur(Math.round(Math.max(0, 100 - (elapsed / GAME_DURATION_SECONDS) * 100)));
+
+      if (elapsed >= GAME_DURATION_SECONDS) {
+        clearInterval(intervalId);
+        endGameRef.current(null, true);
+      }
+    }, 100);
+
+    return () => clearInterval(intervalId);
+  }, [gameStarted, gameId, gameEnded]);
+
+  useEffect(() => {
+    if (!gameStarted || gameEnded) return;
+    const t = setTimeout(() => guessInputRef.current?.focus(), 150);
+    return () => clearTimeout(t);
+  }, [gameStarted, gameEnded, gameId]);
+
+  useEffect(() => {
+    if (!gameStarted || !gameId) return;
+
+    let cancelled = false;
+    let currentObjectUrl = null;
+    let consecutiveFailures = 0;
+
+    const poll = async () => {
+      if (gameEnded) return;
+      try {
+        const blob = await fetchBlurImageBlob(gameId);
+        if (cancelled) return;
+
+        const objectUrl = URL.createObjectURL(blob);
+        if (currentObjectUrl) URL.revokeObjectURL(currentObjectUrl);
+        currentObjectUrl = objectUrl;
+
+        consecutiveFailures = 0;
+        setImageStalled(false);
+        setSecureImageUrl(objectUrl);
+      } catch (err) {
+        consecutiveFailures += 1;
+        if (consecutiveFailures >= 3) setImageStalled(true);
+      }
+    };
+
+    poll();
+    const intervalId = setInterval(poll, 1000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(intervalId);
+      if (currentObjectUrl) URL.revokeObjectURL(currentObjectUrl);
+    };
+  }, [gameStarted, gameId, gameEnded]);
+
+  const startNewGame = async () => {
+    isGameStartingRef.current = true;
+    cleanupGame();
+
+    setLoading(true);
+    setError('');
+    setSuccess('');
+    setResult(null);
+    setGameEnded(false);
+    setCanGuess(true);
+    setGuess('');
+    setWrongGuesses(0);
+    setMaxGuesses(3);
+    setRemainingGuesses(3);
+    setGuessedNames([]);
+    gameAbandonedRef.current = false;
+    isGameEndingRef.current = false;
+
+    try {
+      const data = await startGame();
+
+      if (data.success && data.gameId) {
+        setGameId(data.gameId);
+        setGameStarted(true);
+        setMaxGuesses(data.maxGuesses || 3);
+        setRemainingGuesses(data.maxGuesses || 3);
+
+        setLoading(false);
+        setSuccess(`🎯 Game started! You have ${data.maxGuesses || 3} guesses. Guess within ${CARD_WINDOW_SECONDS} seconds to win the card!`);
+        setTimeout(() => setSuccess(''), 4000);
+      } else {
+        setError(data.message || 'Failed to start game. Please try again.');
+        setLoading(false);
+      }
+    } catch (err) {
+      const data = err.response?.data;
+      if (data?.gameId) {
+        setGameId(data.gameId);
+        setGameStarted(true);
+        setMaxGuesses(data.maxGuesses || 3);
+        setRemainingGuesses(data.maxGuesses || 3);
+
+        setLoading(false);
+        setSuccess('🔄 Resuming existing game...');
+        setTimeout(() => setSuccess(''), 3000);
+      } else {
+        setError(data?.message || 'Failed to start game. Please try again.');
+        setLoading(false);
+      }
+    } finally {
+      isGameStartingRef.current = false;
+    }
+  };
+
   const handleSubmitGuess = (e) => {
     e.preventDefault();
     if (!guess.trim() || !canGuess || isSubmitting || gameEnded || gameAbandonedRef.current) {
@@ -512,38 +409,17 @@ const BlurGame = () => {
     endGame(guess.trim());
   };
 
-  // ============================================================
-  // ✅ KEYBOARD SHORTCUTS
-  // ============================================================
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Enter' && guess.trim() && canGuess && !gameEnded && !gameAbandonedRef.current) {
         handleSubmitGuess(e);
       }
     };
-    
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [guess, canGuess, gameEnded]);
 
-  // ============================================================
-  // ✅ CLEANUP TIMER ON UNMOUNT
-  // ============================================================
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
-      if (secureImageUrl) {
-        URL.revokeObjectURL(secureImageUrl);
-      }
-    };
-  }, [secureImageUrl]);
-
-  // ============================================================
-  // ✅ RENDER
-  // ============================================================
-  
   if (loading) {
     return (
       <div className="blur-game-page">
@@ -555,15 +431,19 @@ const BlurGame = () => {
     );
   }
 
+  const urgency = timeElapsed <= 15 ? 'calm' : timeElapsed <= CARD_WINDOW_SECONDS ? 'ready' : timeElapsed <= 45 ? 'warn' : 'urgent';
+  const imgSrc = secureImageUrl || (imageStalled ? PLACEHOLDER_ERROR : PLACEHOLDER_LOADING);
+
   return (
     <div className="blur-game-page">
       <div className="blur-game-bg-noise"></div>
       <div className="blur-game-bg-grid"></div>
-      
+      <div className="blur-game-bg-glow"></div>
+
       <div className="blur-game-header">
         <h1>🔮 Mystery Character</h1>
         <p>Guess the character before the image becomes clear!</p>
-        <p className="warning-text">⚠️ Don't leave the page or switch tabs - it counts as a loss!</p>
+        <p className="warning-text">⚠️ Don't leave the page or switch tabs — it counts as a loss!</p>
       </div>
 
       {stats && (
@@ -605,8 +485,8 @@ const BlurGame = () => {
               <div className="rule-item highlight">
                 <span className="rule-icon">🏆</span>
                 <div>
-                  <strong>0-30s - WIN THE CARD!</strong>
-                  <span>Guess correctly within 30 seconds → Win the character card!</span>
+                  <strong>0–{CARD_WINDOW_SECONDS}s — WIN THE CARD!</strong>
+                  <span>Guess correctly within {CARD_WINDOW_SECONDS} seconds → Win the character card!</span>
                 </div>
               </div>
               <div className="rule-item">
@@ -619,8 +499,8 @@ const BlurGame = () => {
               <div className="rule-item">
                 <span className="rule-icon">⏰</span>
                 <div>
-                  <strong>30-60s - No Reward</strong>
-                  <span>Guess correctly after 30 seconds → No card, no shards</span>
+                  <strong>{CARD_WINDOW_SECONDS}–{GAME_DURATION_SECONDS}s — No Reward</strong>
+                  <span>Guess correctly after {CARD_WINDOW_SECONDS} seconds → No card, no shards</span>
                 </div>
               </div>
               <div className="rule-item warning">
@@ -641,7 +521,7 @@ const BlurGame = () => {
           <div className="game-info">
             <div className="timer-section">
               <span className="timer-label">⏱️ Time</span>
-              <span className={`timer-value ${timeElapsed <= 30 ? 'good' : 'warning'}`}>
+              <span className={`timer-value ${timeElapsed <= CARD_WINDOW_SECONDS ? 'good' : 'warning'}`}>
                 {timeElapsed}s
               </span>
             </div>
@@ -657,27 +537,21 @@ const BlurGame = () => {
             </div>
             <div className="reward-section">
               <span className="reward-label">🎯 Status</span>
-              <span className={`reward-value ${timeElapsed <= 30 ? 'active' : 'expired'}`}>
-                {timeElapsed <= 30 ? '🏆 Card Reward' : '❌ No Reward'}
+              <span className={`reward-value ${timeElapsed <= CARD_WINDOW_SECONDS ? 'active' : 'expired'}`}>
+                {timeElapsed <= CARD_WINDOW_SECONDS ? '🏆 Card Reward' : '❌ No Reward'}
               </span>
             </div>
           </div>
 
-          <div className="image-container">
-            <img 
-              src={secureImageUrl || 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="400"%3E%3Crect width="400" height="400" fill="%231a1a2e"/%3E%3Ctext x="50" y="200" font-family="Arial" font-size="24" fill="%2394a3b8"%3ELoading...%3C/text%3E%3C/svg%3E'}
+          <div className={`image-container urgency-${urgency}`}>
+            <img
+              src={imgSrc}
               alt="Mystery Character"
               className="mystery-image"
-              style={{ 
-                transition: 'filter 0.3s ease, opacity 0.3s ease',
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover'
-              }}
-              onError={(e) => {
-                e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400"%3E%3Crect width="400" height="400" fill="%231a1a2e"/%3E%3Ctext x="50" y="200" font-family="Arial" font-size="24" fill="%2394a3b8"%3ENo Image Available%3C/text%3E%3C/svg%3E';
-              }}
             />
+            {imageStalled && !gameEnded && (
+              <div className="image-stalled-badge">🔄 Reconnecting…</div>
+            )}
             {!gameEnded && (
               <div className="image-overlay">
                 <span className="overlay-text">
@@ -691,11 +565,11 @@ const BlurGame = () => {
 
           <div className="progress-container">
             <div className="progress-bar">
-              <div 
+              <div
                 className="progress-fill"
                 style={{
                   width: `${100 - displayBlur}%`,
-                  background: timeElapsed <= 30 
+                  background: timeElapsed <= CARD_WINDOW_SECONDS
                     ? 'linear-gradient(90deg, #4a9eff, #6c63ff)'
                     : 'linear-gradient(90deg, #f59e0b, #ef4444)'
                 }}
@@ -731,9 +605,9 @@ const BlurGame = () => {
                     <p className="result-hint">📝 Guessed: {result.guessedNames.join(', ')}</p>
                   )}
                   {!result.wonCard && result.isCorrect && result.message !== '🚪 You left the game!' && (
-                    <p className="result-hint">💡 You guessed correctly but took longer than 30 seconds! No card this time.</p>
+                    <p className="result-hint">💡 You guessed correctly but took longer than {CARD_WINDOW_SECONDS} seconds! No card this time.</p>
                   )}
-                  {!result.isCorrect && result.message !== '🚪 You left the game!' && result.message !== '⏰ Time\'s up!' && (
+                  {!result.isCorrect && result.characterName !== 'Revealing…' && (
                     <p className="result-hint">💡 The character was: <strong>{result.characterName}</strong> from {result.anime}</p>
                   )}
                 </div>
@@ -753,8 +627,8 @@ const BlurGame = () => {
                 disabled={!canGuess || isSubmitting}
                 autoFocus
               />
-              <button 
-                type="submit" 
+              <button
+                type="submit"
                 className="guess-btn"
                 disabled={!guess.trim() || !canGuess || isSubmitting}
               >
@@ -795,7 +669,7 @@ const BlurGame = () => {
           )}
           {!gameEnded && (
             <div className="warning-hint">
-              <p>🚪 Don't leave the page or switch tabs - it counts as a loss!</p>
+              <p>🚪 Don't leave the page or switch tabs — it counts as a loss!</p>
             </div>
           )}
         </div>

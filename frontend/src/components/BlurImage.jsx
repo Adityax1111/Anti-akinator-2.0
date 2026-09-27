@@ -1,4 +1,12 @@
 // /frontend/src/components/BlurImage.jsx
+//
+// NOTE: This is a general-purpose reusable component and is NOT part of
+// the secure BlurGame flow (BlurGame.jsx renders its own image via the
+// authenticated /image/:gameId proxy). It's left functionally identical
+// to before — only the CSS has been aligned to the same premium palette
+// as the game page. If you use this elsewhere for anything where the
+// source URL must stay secret, route the `src` through a server-side
+// proxy the same way BlurGame.jsx does, rather than passing a raw URL.
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import './BlurImage.css';
 
@@ -26,34 +34,29 @@ const BlurImage = ({
   const [error, setError] = useState(false);
   const [currentBlur, setCurrentBlur] = useState(blurAmount);
 
-  // Update blur when prop changes
   useEffect(() => {
     setCurrentBlur(blurAmount);
   }, [blurAmount]);
 
-  // Handle image load
   const handleImageLoad = () => {
     setIsLoaded(true);
     onImageLoad();
   };
 
-  // Handle image error
   const handleImageError = (e) => {
     setError(true);
     onImageError(e);
   };
 
-  // Calculate blur intensity
   const getBlurStyle = () => {
     const blur = Math.min(Math.max(currentBlur, minBlur), maxBlur);
     return {
       filter: `blur(${blur}px)`,
       WebkitFilter: `blur(${blur}px)`,
-      transition: `filter ${transitionSpeed} ease-in-out, WebkitFilter ${transitionSpeed} ease-in-out`
+      transition: `filter ${transitionSpeed} ease-in-out`
     };
   };
 
-  // Get blur intensity label
   const getBlurIntensity = () => {
     const percentage = maxBlur > 0 ? (currentBlur / maxBlur) * 100 : 0;
     if (percentage > 80) return 'Very Blurry';
@@ -62,7 +65,6 @@ const BlurImage = ({
     return 'Clear';
   };
 
-  // Get emoji based on blur level
   const getEmoji = () => {
     const percentage = maxBlur > 0 ? (currentBlur / maxBlur) * 100 : 0;
     if (percentage > 80) return '🔮';
@@ -71,7 +73,6 @@ const BlurImage = ({
     return '🌟';
   };
 
-  // Fallback image if error
   const fallbackImage = () => {
     if (error) {
       return (
@@ -86,7 +87,6 @@ const BlurImage = ({
 
   return (
     <div className={`blur-image-container ${containerClassName}`} style={style}>
-      {/* Main Image */}
       {!error ? (
         <img
           src={src}
@@ -102,23 +102,17 @@ const BlurImage = ({
         fallbackImage()
       )}
 
-      {/* Loading State */}
       {!isLoaded && !error && (
         <div className="blur-image-loading">
           <div className="loading-spinner"></div>
         </div>
       )}
 
-      {/* Overlay with Blur Info */}
       {showOverlay && !error && isLoaded && (
         <div className="blur-image-overlay">
           <div className="overlay-content">
-            {overlayEmoji && (
-              <span className="overlay-emoji">{getEmoji()}</span>
-            )}
-            {overlayText && (
-              <span className="overlay-text">{overlayText}</span>
-            )}
+            {overlayEmoji && <span className="overlay-emoji">{getEmoji()}</span>}
+            {overlayText && <span className="overlay-text">{overlayText}</span>}
             <span className="overlay-blur-level">
               {getBlurIntensity()} ({Math.round(maxBlur > 0 ? (currentBlur / maxBlur) * 100 : 0)}%)
             </span>
@@ -126,7 +120,6 @@ const BlurImage = ({
         </div>
       )}
 
-      {/* Blur Progress Badge */}
       {!error && isLoaded && (
         <div className="blur-progress-badge">
           <span className="blur-badge-icon">👁️</span>
@@ -149,7 +142,7 @@ export const BlurImageWithTimer = ({
   initialBlur = 50,
   maxBlur = 50,
   minBlur = 0,
-  duration = 60, // seconds
+  duration = 60,
   onComplete = () => {},
   onBlurUpdate = () => {},
   autoStart = true,
@@ -165,27 +158,23 @@ export const BlurImageWithTimer = ({
   const timerRef = useRef(null);
   const startTimeRef = useRef(null);
 
-  // Start timer
   const startTimer = useCallback(() => {
     if (timerRef.current) return;
     setIsRunning(true);
     startTimeRef.current = Date.now();
-    
+
     timerRef.current = setInterval(() => {
       const elapsed = (Date.now() - startTimeRef.current) / 1000;
       const newTime = Math.min(elapsed, duration);
       setTimeElapsed(newTime);
-      
-      // Calculate blur: starts at initialBlur, decreases to minBlur over duration
+
       const progress = newTime / duration;
       const newBlur = Math.max(minBlur, initialBlur - (initialBlur - minBlur) * progress);
       const roundedBlur = Math.round(newBlur);
       setBlur(roundedBlur);
-      
-      // Notify blur update
+
       onBlurUpdate(roundedBlur);
-      
-      // Check if complete
+
       if (newTime >= duration) {
         setIsComplete(true);
         setIsRunning(false);
@@ -198,7 +187,6 @@ export const BlurImageWithTimer = ({
     }, 100);
   }, [duration, initialBlur, minBlur, onBlurUpdate, onComplete]);
 
-  // Stop timer
   const stopTimer = useCallback(() => {
     setIsRunning(false);
     if (timerRef.current) {
@@ -207,7 +195,6 @@ export const BlurImageWithTimer = ({
     }
   }, []);
 
-  // Reset timer
   const resetTimer = useCallback(() => {
     stopTimer();
     setTimeElapsed(0);
@@ -219,7 +206,6 @@ export const BlurImageWithTimer = ({
     }
   }, [stopTimer, initialBlur, autoStart, startTimer]);
 
-  // Auto-start on mount
   useEffect(() => {
     if (autoStart) {
       startTimer();
@@ -231,20 +217,15 @@ export const BlurImageWithTimer = ({
     };
   }, [autoStart, startTimer]);
 
-  // Format time
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
-    if (mins > 0) {
-      return `${mins}m ${secs}s`;
-    }
+    if (mins > 0) return `${mins}m ${secs}s`;
     return `${secs}s`;
   };
 
-  // Calculate progress percentage
   const progressPercentage = Math.min((timeElapsed / duration) * 100, 100);
 
-  // Get status color
   const getStatusColor = () => {
     if (isComplete) return '#10b981';
     if (timeElapsed / duration > 0.7) return '#ef4444';
@@ -252,12 +233,10 @@ export const BlurImageWithTimer = ({
     return '#6c63ff';
   };
 
-  // Get blur percentage
   const blurPercentage = maxBlur > 0 ? Math.round((blur / maxBlur) * 100) : 0;
 
   return (
     <div className="blur-image-timer-container">
-      {/* Timer Display */}
       {showTimer && (
         <div className="blur-timer-display">
           <div className="timer-info">
@@ -282,7 +261,6 @@ export const BlurImageWithTimer = ({
         </div>
       )}
 
-      {/* Blur Image */}
       <BlurImage
         src={src}
         alt={alt}
@@ -294,11 +272,10 @@ export const BlurImageWithTimer = ({
         {...props}
       />
 
-      {/* Progress Bar */}
       {showProgress && (
         <div className="blur-progress-container">
           <div className="blur-progress-bar">
-            <div 
+            <div
               className="blur-progress-fill"
               style={{
                 width: `${progressPercentage}%`,
@@ -317,7 +294,7 @@ export const BlurImageWithTimer = ({
 };
 
 // ============================================================
-// SIMPLE BLUR IMAGE (Game Version - matches your game's logic)
+// SIMPLE BLUR IMAGE (Game Version)
 // ============================================================
 export const GameBlurImage = ({
   src,
@@ -332,7 +309,6 @@ export const GameBlurImage = ({
   showBadge = true,
   ...props
 }) => {
-  // Calculate blur based on time elapsed
   const getBlurFromTime = (time) => {
     const progress = Math.min(time / maxTime, 1);
     const blur = Math.max(minBlur, maxBlur - (maxBlur - minBlur) * progress);
@@ -341,17 +317,14 @@ export const GameBlurImage = ({
 
   const [blur, setBlur] = useState(getBlurFromTime(timeElapsed));
 
-  // Update blur when time changes
   useEffect(() => {
     const newBlur = getBlurFromTime(timeElapsed);
     setBlur(newBlur);
     onBlurUpdate(newBlur);
   }, [timeElapsed, maxTime, maxBlur, minBlur, onBlurUpdate]);
 
-  // Get display percentage
   const displayPercentage = maxBlur > 0 ? Math.round((blur / maxBlur) * 100) : 0;
 
-  // Get emoji based on blur
   const getEmoji = () => {
     if (displayPercentage > 80) return '🔮';
     if (displayPercentage > 50) return '👀';
@@ -359,7 +332,6 @@ export const GameBlurImage = ({
     return '🌟';
   };
 
-  // Get overlay text
   const getOverlayText = () => {
     if (displayPercentage > 80) return 'Too blurry! 👀';
     if (displayPercentage > 50) return 'Getting clearer...';
@@ -385,7 +357,7 @@ export const GameBlurImage = ({
         draggable="false"
         {...props}
       />
-      
+
       {showOverlay && (
         <div className="game-blur-image-overlay">
           <div className="game-overlay-content">
@@ -394,7 +366,7 @@ export const GameBlurImage = ({
           </div>
         </div>
       )}
-      
+
       {showBadge && (
         <div className="game-blur-badge">
           <span>👁️ {displayPercentage}% blur</span>

@@ -21,21 +21,12 @@
   transition: filter 0.3s ease-in-out;
 }
 
-.blur-image.loading {
-  opacity: 0;
-}
+.blur-image.loading { opacity: 0; }
+.blur-image.loaded { opacity: 1; }
 
-.blur-image.loaded {
-  opacity: 1;
-}
-
-/* Loading State */
 .blur-image-loading {
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: 0;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -51,11 +42,8 @@
   animation: spin 0.8s linear infinite;
 }
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
+@keyframes spin { to { transform: rotate(360deg); } }
 
-/* Fallback */
 .blur-image-fallback {
   width: 100%;
   height: 100%;
@@ -68,26 +56,17 @@
   gap: 0.5rem;
 }
 
-.fallback-icon {
-  font-size: 3rem;
-}
+.fallback-icon { font-size: 3rem; }
+.fallback-text { font-size: 0.9rem; }
 
-.fallback-text {
-  font-size: 0.9rem;
-}
-
-/* Overlay */
 .blur-image-overlay {
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: 0;
   display: flex;
   justify-content: center;
   align-items: center;
   pointer-events: none;
-  background: rgba(0, 0, 0, 0.15);
+  background: rgba(0, 0, 0, 0.18);
   transition: background 0.5s ease;
 }
 
@@ -102,6 +81,7 @@
 .overlay-emoji {
   font-size: 4rem;
   animation: pulse 2s ease-in-out infinite;
+  filter: drop-shadow(0 4px 14px rgba(0, 0, 0, 0.5));
 }
 
 @keyframes pulse {
@@ -110,47 +90,40 @@
 }
 
 .overlay-text {
-  color: rgba(255, 255, 255, 0.9);
+  color: rgba(255, 255, 255, 0.92);
   font-size: 1.2rem;
   font-weight: 600;
   text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
 }
 
 .overlay-blur-level {
-  color: rgba(255, 255, 255, 0.7);
+  color: rgba(255, 255, 255, 0.72);
   font-size: 0.85rem;
-  background: rgba(0, 0, 0, 0.4);
-  padding: 0.2rem 0.8rem;
+  background: rgba(0, 0, 0, 0.42);
+  padding: 0.2rem 0.85rem;
   border-radius: 20px;
-  backdrop-filter: blur(4px);
+  backdrop-filter: blur(6px);
 }
 
-/* Blur Badge */
 .blur-progress-badge {
   position: absolute;
   bottom: 1rem;
   right: 1rem;
-  background: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(8px);
-  padding: 0.3rem 0.8rem;
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(10px);
+  padding: 0.3rem 0.85rem;
   border-radius: 20px;
   font-size: 0.75rem;
   color: #94a3b8;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.07);
   display: flex;
   align-items: center;
   gap: 0.3rem;
   pointer-events: none;
 }
 
-.blur-badge-icon {
-  font-size: 0.7rem;
-}
-
-.blur-badge-value {
-  font-weight: 600;
-  color: #e2e8f0;
-}
+.blur-badge-icon { font-size: 0.7rem; }
+.blur-badge-value { font-weight: 600; color: #e2e8f0; }
 
 /* ============================================================
    BLUR IMAGE WITH TIMER
@@ -163,28 +136,20 @@
   margin: 0 auto;
 }
 
-/* Timer Display */
 .blur-timer-display {
   display: flex;
   justify-content: space-between;
   align-items: center;
   background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(8px);
-  padding: 0.6rem 1rem;
-  border-radius: 12px;
-  margin-bottom: 0.8rem;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(10px);
+  padding: 0.65rem 1.05rem;
+  border-radius: 14px;
+  margin-bottom: 0.85rem;
+  border: 1px solid rgba(255, 255, 255, 0.07);
 }
 
-.timer-info {
-  display: flex;
-  align-items: center;
-  gap: 0.8rem;
-}
-
-.timer-icon {
-  font-size: 1.2rem;
-}
+.timer-info { display: flex; align-items: center; gap: 0.8rem; }
+.timer-icon { font-size: 1.2rem; }
 
 .timer-value {
   font-size: 1.3rem;
@@ -196,40 +161,32 @@
 .timer-status {
   font-size: 0.75rem;
   color: #94a3b8;
-  padding: 0.1rem 0.6rem;
+  padding: 0.1rem 0.65rem;
   background: rgba(255, 255, 255, 0.05);
   border-radius: 12px;
 }
 
-.timer-controls {
-  display: flex;
-  gap: 0.4rem;
-}
+.timer-controls { display: flex; gap: 0.4rem; }
 
 .timer-btn {
   background: rgba(255, 255, 255, 0.08);
   border: none;
   color: #e2e8f0;
-  padding: 0.3rem 0.6rem;
-  border-radius: 8px;
+  padding: 0.3rem 0.65rem;
+  border-radius: 9px;
   cursor: pointer;
   font-size: 1rem;
   transition: all 0.2s ease;
 }
 
 .timer-btn:hover {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.16);
   transform: scale(1.05);
 }
 
-.timer-btn:active {
-  transform: scale(0.95);
-}
+.timer-btn:active { transform: scale(0.95); }
 
-/* Progress Bar */
-.blur-progress-container {
-  margin-top: 0.8rem;
-}
+.blur-progress-container { margin-top: 0.85rem; }
 
 .blur-progress-bar {
   width: 100%;
@@ -255,7 +212,7 @@
 }
 
 /* ============================================================
-   GAME BLUR IMAGE (For your game)
+   GAME BLUR IMAGE
    ============================================================ */
 
 .game-blur-image-container {
@@ -263,10 +220,10 @@
   width: 100%;
   aspect-ratio: 1/1;
   overflow: hidden;
-  border-radius: 16px;
+  border-radius: 18px;
   background: #0a0a1a;
-  border: 2px solid rgba(255, 255, 255, 0.06);
-  box-shadow: 0 10px 30px -8px rgba(0, 0, 0, 0.5);
+  border: 2px solid rgba(255, 255, 255, 0.07);
+  box-shadow: 0 12px 32px -10px rgba(0, 0, 0, 0.55);
 }
 
 .game-blur-image {
@@ -278,15 +235,12 @@
 
 .game-blur-image-overlay {
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: 0;
   display: flex;
   justify-content: center;
   align-items: center;
   pointer-events: none;
-  background: rgba(0, 0, 0, 0.15);
+  background: rgba(0, 0, 0, 0.18);
   transition: background 0.5s ease;
 }
 
@@ -303,27 +257,27 @@
 }
 
 .game-overlay-text {
-  color: rgba(255, 255, 255, 0.8);
+  color: rgba(255, 255, 255, 0.85);
   font-size: 1rem;
   font-weight: 500;
   text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
-  background: rgba(0, 0, 0, 0.3);
-  padding: 0.2rem 0.8rem;
+  background: rgba(0, 0, 0, 0.32);
+  padding: 0.2rem 0.85rem;
   border-radius: 20px;
-  backdrop-filter: blur(4px);
+  backdrop-filter: blur(6px);
 }
 
 .game-blur-badge {
   position: absolute;
   bottom: 1rem;
   right: 1rem;
-  background: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(8px);
-  padding: 0.3rem 0.8rem;
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(10px);
+  padding: 0.3rem 0.85rem;
   border-radius: 20px;
   font-size: 0.75rem;
   color: #94a3b8;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.07);
   pointer-events: none;
 }
 
@@ -332,59 +286,19 @@
    ============================================================ */
 
 @media (max-width: 768px) {
-  .overlay-emoji {
-    font-size: 3rem;
-  }
-  
-  .overlay-text {
-    font-size: 1rem;
-  }
-  
-  .overlay-blur-level {
-    font-size: 0.75rem;
-  }
-  
-  .game-overlay-emoji {
-    font-size: 3rem;
-  }
-  
-  .game-overlay-text {
-    font-size: 0.85rem;
-  }
-  
-  .timer-value {
-    font-size: 1rem;
-    min-width: 45px;
-  }
-  
-  .blur-timer-display {
-    padding: 0.4rem 0.8rem;
-    flex-wrap: wrap;
-    gap: 0.4rem;
-  }
-  
-  .timer-info {
-    flex-wrap: wrap;
-    gap: 0.4rem;
-  }
+  .overlay-emoji { font-size: 3rem; }
+  .overlay-text { font-size: 1rem; }
+  .overlay-blur-level { font-size: 0.75rem; }
+  .game-overlay-emoji { font-size: 3rem; }
+  .game-overlay-text { font-size: 0.85rem; }
+  .timer-value { font-size: 1rem; min-width: 45px; }
+  .blur-timer-display { padding: 0.4rem 0.8rem; flex-wrap: wrap; gap: 0.4rem; }
+  .timer-info { flex-wrap: wrap; gap: 0.4rem; }
 }
 
 @media (max-width: 480px) {
-  .overlay-emoji {
-    font-size: 2.5rem;
-  }
-  
-  .game-overlay-emoji {
-    font-size: 2.5rem;
-  }
-  
-  .blur-progress-badge {
-    font-size: 0.65rem;
-    padding: 0.2rem 0.6rem;
-  }
-  
-  .game-blur-badge {
-    font-size: 0.65rem;
-    padding: 0.2rem 0.6rem;
-  }
+  .overlay-emoji { font-size: 2.5rem; }
+  .game-overlay-emoji { font-size: 2.5rem; }
+  .blur-progress-badge { font-size: 0.65rem; padding: 0.2rem 0.6rem; }
+  .game-blur-badge { font-size: 0.65rem; padding: 0.2rem 0.6rem; }
 }

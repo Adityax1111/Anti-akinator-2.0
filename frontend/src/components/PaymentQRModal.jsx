@@ -123,7 +123,7 @@ const PaymentQRModal = ({
         return false;
       }
 
-      const response = await fetch(`${API_URL}/api/transactions/check-utr`, {
+      const response = await fetch(`${API_URL}/transactions/check-utr`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

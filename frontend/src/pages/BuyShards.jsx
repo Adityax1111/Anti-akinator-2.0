@@ -7,10 +7,10 @@ import PaymentQRModal from '../components/PaymentQRModal';
 import './BuyShards.css';
 
 const shardPackages = [
-  { id: 1, name: 'STARTER', shards: 50, price: '₹5 INR', priceValue: 5, hints: 0, tag: null },
-  { id: 2, name: 'ENTHUSIAST', shards: 100, price: '₹15 INR', priceValue: 15, hints: 1, tag: null },
+  { id: 1, name: 'STARTER', shards: 50, price: '₹10 INR', priceValue: 10, hints: 0, tag: null },
+  { id: 2, name: 'ENTHUSIAST', shards: 100, price: '₹20 INR', priceValue: 20, hints: 1, tag: null },
   { id: 3, name: 'PRO', shards: 300, price: '₹30 INR', priceValue: 30, hints: 3, tag: null },
-  { id: 4, name: 'POPULAR', shards: 700, price: '₹35 INR', priceValue: 35, hints: 7, tag: '⭐ Popular' },
+  { id: 4, name: 'POPULAR', shards: 700, price: '₹40 INR', priceValue: 40, hints: 7, tag: '⭐ Popular' },
   { id: 5, name: 'ULTIMATE', shards: 1000, price: '₹50 INR', priceValue: 50, hints: 10, tag: null },
   { id: 6, name: 'LEGENDARY', shards: 2000, price: '₹90 INR', priceValue: 90, hints: 20, tag: null },
 ];

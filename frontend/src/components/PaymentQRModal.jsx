@@ -201,7 +201,7 @@ const PaymentQRModal = ({
         return;
       }
 
-      const response = await fetch(`${API_URL}/api/transactions/create`, {
+      const response = await fetch(`${API_URL}/transactions/create`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

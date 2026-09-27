@@ -730,7 +730,7 @@ YOU WILL BE TESTED. ANY MISTAKE = GAME OVER. THINK. READ EVERYTHING. PROTECT IDE
       });
     }
 
-    // ✅ FORCE PARSE ANSWER
+    // ✅ FORCE PARSE ANSWER (FIXED: Removed local smart matching override)
     let finalAnswer = 'IDK';
     const lowerAnswer = answer.toLowerCase().trim();
 
@@ -738,41 +738,21 @@ YOU WILL BE TESTED. ANY MISTAKE = GAME OVER. THINK. READ EVERYTHING. PROTECT IDE
     if (isIdentityRevealQuestion(sanitizedQuestion)) {
       finalAnswer = 'IDK';
     } else {
-      // ✅ SMART MATCHING (SECURITY LAYER 2)
-      const smartMatch = getSmartAnswer(sanitizedQuestion, character);
-      
-      if (smartMatch.isIdentityQuestion) {
+      // ✅ TRUST THE AI (The AI has full context and is smarter than local keyword matching)
+      if (lowerAnswer === 'yes' || lowerAnswer.includes('yes')) {
+        finalAnswer = 'Yes';
+      } 
+      else if (lowerAnswer === 'no' || lowerAnswer.includes('no') || lowerAnswer.includes('not') || lowerAnswer.includes('isn\'t') || lowerAnswer.includes('doesn\'t')) {
+        finalAnswer = 'No';
+      } 
+      else if (lowerAnswer === 'maybe' || lowerAnswer.includes('maybe')) {
+        finalAnswer = 'Maybe';
+      } 
+      else if (lowerAnswer === 'idk' || lowerAnswer.includes('dont know') || lowerAnswer.includes("don't know") || lowerAnswer.includes('not sure') || lowerAnswer.includes('unknown')) {
         finalAnswer = 'IDK';
-      } else if (smartMatch.match) {
-        // We found a match in character data
-        
-        // Check if the AI answer is IDK but we found a match
-        if (lowerAnswer === 'idk' || lowerAnswer === 'maybe' || lowerAnswer === 'no') {
-          finalAnswer = 'Yes';
-        } else {
-          finalAnswer = 'Yes';
-        }
-      } else {
-        // Check for Yes
-        if (lowerAnswer === 'yes') {
-          finalAnswer = 'Yes';
-        } 
-        // Check for No
-        else if (lowerAnswer === 'no' || lowerAnswer.includes('not') || lowerAnswer.includes('isn\'t') || lowerAnswer.includes('doesn\'t')) {
-          finalAnswer = 'No';
-        } 
-        // Check for Maybe
-        else if (lowerAnswer === 'maybe') {
-          finalAnswer = 'Maybe';
-        } 
-        // Check for IDK
-        else if (lowerAnswer === 'idk' || lowerAnswer.includes('dont know') || lowerAnswer.includes("don't know") || lowerAnswer.includes('not sure') || lowerAnswer.includes('unknown')) {
-          finalAnswer = 'IDK';
-        } 
-        // Default to IDK
-        else {
-          finalAnswer = 'IDK';
-        }
+      } 
+      else {
+        finalAnswer = 'IDK';
       }
     }
 
